@@ -36,7 +36,6 @@ body {
     radial-gradient(circle at 80% 90%, rgba(88,166,255,0.04), transparent 40%);
 }
 
-/* Subtle grain overlay */
 body::after {
   content: "";
   position: fixed;
@@ -139,6 +138,12 @@ body::after {
   min-width: 60px;
 }
 
+#phase {
+  font-weight: 600;
+  color: var(--text-dim);
+  min-width: 90px;
+}
+
 #conn { margin-left: auto; color: var(--text-mute); }
 #conn.ok { color: var(--ok); }
 
@@ -199,10 +204,23 @@ body::after {
 .cop-pad .label-tag.top    { top: -16px; left: 0; }
 .cop-pad .label-tag.bottom { bottom: -16px; right: 0; }
 
-/* Status indicator bar above the COP pad */
+/* Mode-driven highlight on the dot */
 [data-mode="ZOOM_IN"]  #cop-dot { background: var(--accent-cool); box-shadow: 0 0 0 3px rgba(88,166,255,0.2), 0 0 12px rgba(88,166,255,0.4); }
 [data-mode="ZOOM_OUT"] #cop-dot { background: var(--warn); box-shadow: 0 0 0 3px rgba(249,117,131,0.2), 0 0 12px rgba(249,117,131,0.4); }
 [data-mode="ABSENT"]   #cop-dot { background: var(--text-mute); box-shadow: none; }
+
+/* Re-zero state — pulsing cool ring while collecting offset samples */
+[data-status="REZEROING"] {
+  animation: rezero-pulse 1.4s ease-in-out infinite;
+}
+[data-status="REZEROING"] .label-tag.bottom::after {
+  content: " · calibrating";
+  color: var(--accent-cool);
+}
+@keyframes rezero-pulse {
+  0%, 100% { border-color: var(--line-bright); box-shadow: 0 8px 24px rgba(0,0,0,0.6); }
+  50%      { border-color: var(--accent-cool); box-shadow: 0 8px 24px rgba(0,0,0,0.6), 0 0 18px rgba(88,166,255,0.35); }
+}
 
 /* -------------------------------------------------------------------------- */
 /* BalanceGuessr layout                                                       */
@@ -333,7 +351,7 @@ body::after {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Welcome / help (only shown briefly)                                        */
+/* Welcome / help                                                             */
 /* -------------------------------------------------------------------------- */
 
 .help {

@@ -17,3 +17,8 @@ bridge/calibration.json
 
 # Logs
 *.log
+
+# Node / Vite (web/)
+node_modules/
+dist/
+.vite/

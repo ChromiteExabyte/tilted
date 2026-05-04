@@ -7,17 +7,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <div class="topbar">
     <div class="brand">balance<small>GUESSR</small></div>
     <div><span class="label">round</span><span class="value" id="round">round 1</span></div>
     <div><span class="label">stage</span><span class="value" id="game-mode">STUDY</span></div>
+    <div><span class="label">phase</span><span class="value" id="phase">—</span></div>
     <div><span class="label">score</span><span class="value" id="score">0 pts</span></div>
-    <div><a href="index.html" style="color:var(--text-dim);text-decoration:none;letter-spacing:0.2em;">← ATLAS</a></div>
+    <div><a href="/index.html" style="color:var(--text-dim);text-decoration:none;letter-spacing:0.2em;">← ATLAS</a></div>
     <div id="conn">○ connecting</div>
   </div>
 
@@ -51,10 +49,6 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
-  <script src="js/bridge-client.js"></script>
-  <script src="js/gestures.js"></script>
-  <script src="js/guesser.js"></script>
+  <script type="module" src="/src/guesser.ts"></script>
 </body>
 </html>
