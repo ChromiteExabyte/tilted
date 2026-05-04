@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>BalanceGuessr</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">balance<small>GUESSR</small></div>
+    <div><span class="label">round</span><span class="value" id="round">round 1</span></div>
+    <div><span class="label">stage</span><span class="value" id="game-mode">STUDY</span></div>
+    <div><span class="label">score</span><span class="value" id="score">0 pts</span></div>
+    <div><a href="index.html" style="color:var(--text-dim);text-decoration:none;letter-spacing:0.2em;">← ATLAS</a></div>
+    <div id="conn">○ connecting</div>
+  </div>
+
+  <div class="guessr-stage">
+    <div class="panel active" id="study-panel">
+      <div class="panel-label">study · satellite imagery</div>
+      <div id="study"></div>
+    </div>
+    <div class="panel" id="guess-panel">
+      <div class="panel-label">guess · place a pin</div>
+      <div id="guess"></div>
+      <div class="crosshair"></div>
+    </div>
+  </div>
+
+  <div id="reveal" class="hidden">
+    <div>
+      <div id="reveal-name">—</div>
+      <span id="reveal-hint"></span>
+    </div>
+    <div class="reveal-stat">
+      <span class="k">distance</span>
+      <span class="v dist" id="reveal-dist">—</span>
+    </div>
+    <div class="reveal-stat">
+      <span class="k">score</span>
+      <span class="v" id="reveal-score">—</span>
+    </div>
+    <div class="reveal-cta">
+      pin gesture or <kbd>G</kbd> · next round
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="js/bridge-client.js"></script>
+  <script src="js/gestures.js"></script>
+  <script src="js/guesser.js"></script>
+</body>
+</html>

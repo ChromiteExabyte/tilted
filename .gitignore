@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# Calibration / runtime state
+bridge/calibration.json
+
+# Editor
+.vscode/
+.idea/
+*.swp
+.DS_Store
+.claude/
+
+# Logs
+*.log

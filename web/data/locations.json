@@ -1,0 +1,25 @@
+{
+  "regions": [
+    {
+      "name": "Northern Ontario",
+      "bounds": { "north": 51.5, "south": 47.5, "west": -87.5, "east": -78.5 }
+    }
+  ],
+  "locations": [
+    { "name": "Hollinger Open Pit", "lat": 48.4760, "lon": -81.3260, "category": "mine", "hint": "Reclaimed open pit on the edge of Timmins." },
+    { "name": "Kidd Mine headframe", "lat": 48.6926, "lon": -81.3676, "category": "mine", "hint": "World's deepest base-metal mine, north of Timmins." },
+    { "name": "Adams Mine pits", "lat": 47.9250, "lon": -80.0200, "category": "mine", "hint": "Iron mine pits east of Kirkland Lake." },
+    { "name": "Detour Lake Mine", "lat": 50.0260, "lon": -79.7370, "category": "mine", "hint": "Open-pit gold mine near the Quebec border." },
+    { "name": "Cochrane railway yard", "lat": 49.0666, "lon": -81.0149, "category": "town", "hint": "Northlander junction town." },
+    { "name": "Moosonee", "lat": 51.2719, "lon": -80.6444, "category": "town", "hint": "End of the Polar Bear Express line." },
+    { "name": "Smooth Rock Falls", "lat": 49.2667, "lon": -81.6333, "category": "town", "hint": "Mattagami River paper-mill town." },
+    { "name": "Iroquois Falls", "lat": 48.7667, "lon": -80.6833, "category": "town", "hint": "Abitibi River mill town." },
+    { "name": "Lady Evelyn Falls", "lat": 47.3522, "lon": -80.3483, "category": "natural", "hint": "Falls in Lady Evelyn-Smoothwater Park." },
+    { "name": "Ouimet Canyon", "lat": 48.8000, "lon": -88.6667, "category": "natural", "hint": "150 m deep canyon NE of Thunder Bay." },
+    { "name": "Greenwater Lake", "lat": 49.3000, "lon": -82.4000, "category": "natural", "hint": "Greenwater Provincial Park, west of Cochrane." },
+    { "name": "Kapuskasing town circle", "lat": 49.4167, "lon": -82.4333, "category": "town", "hint": "Planned company town with a circular street pattern." },
+    { "name": "Hearst", "lat": 49.6833, "lon": -83.6667, "category": "town", "hint": "Francophone forestry town on Highway 11." },
+    { "name": "Wawa Goose", "lat": 47.9956, "lon": -84.7714, "category": "landmark", "hint": "Giant goose statue on Highway 17." },
+    { "name": "Sudbury Big Nickel", "lat": 46.4769, "lon": -81.0250, "category": "landmark", "hint": "9 m nickel coin landmark." }
+  ]
+}

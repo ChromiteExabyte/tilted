@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>balance-board-leaflet</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="brand">balance<small>BOARD ATLAS</small></div>
+    <div><span class="label">mode</span><span class="value" id="mode">ABSENT</span></div>
+    <div><span class="label">load</span><span class="value" id="weight">—</span></div>
+    <div><a href="guesser.html" style="color:var(--text-dim);text-decoration:none;letter-spacing:0.2em;">→ BALANCEGUESSR</a></div>
+    <div id="conn">○ connecting</div>
+  </div>
+
+  <div id="map"></div>
+
+  <div id="status" class="cop-pad" data-mode="ABSENT">
+    <span class="label-tag top">center of pressure</span>
+    <span class="corner tl"></span>
+    <span class="corner tr"></span>
+    <span class="corner bl"></span>
+    <span class="corner br"></span>
+    <div id="cop-dot"></div>
+    <span class="label-tag bottom">live</span>
+  </div>
+
+  <div class="help">
+    <strong>Quick gestures</strong>
+    <dl>
+      <dt>Pan</dt>     <dd>Tilt — body weight steers the map.</dd>
+      <dt>Zoom in</dt> <dd>Lift left leg.</dd>
+      <dt>Zoom out</dt><dd>Lift right leg.</dd>
+      <dt>Speed</dt>   <dd>Bob up/down while leg raised.</dd>
+      <dt>Pause</dt>   <dd>Step off.</dd>
+    </dl>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+  <script src="js/bridge-client.js"></script>
+  <script src="js/gestures.js"></script>
+  <script src="js/map.js"></script>
+</body>
+</html>
