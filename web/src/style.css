@@ -147,6 +147,23 @@ body::after {
 #conn { margin-left: auto; color: var(--text-mute); }
 #conn.ok { color: var(--ok); }
 
+.conn-button {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.conn-button:hover {
+  border-color: var(--line-bright);
+  background: var(--bg-panel);
+}
+.conn-button:active { background: var(--bg-panel-elev); }
+
 /* -------------------------------------------------------------------------- */
 /* COP indicator (HUD)                                                        */
 /* -------------------------------------------------------------------------- */
@@ -489,6 +506,147 @@ body::after {
 .summary-cta kbd {
   color: var(--accent);
   font-family: var(--mono);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Source picker modal                                                        */
+/* -------------------------------------------------------------------------- */
+
+.source-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 5000;
+  background: rgba(8, 10, 14, 0.86);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: picker-fade-in 0.18s ease;
+}
+
+@keyframes picker-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.source-picker__panel {
+  width: 100%;
+  max-width: 520px;
+  background: var(--bg-panel);
+  border: 1px solid var(--line-bright);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.7);
+}
+
+.source-picker__title {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: 0.01em;
+}
+.source-picker__sub {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.source-picker__list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.source-picker__option {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 16px 24px;
+  padding: 16px 20px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.1s;
+}
+.source-picker__option:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--bg-panel-elev);
+}
+.source-picker__option:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.source-picker__option:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.source-picker__option-name {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text);
+}
+.source-picker__option-blurb {
+  margin-top: 4px;
+  font-family: var(--serif);
+  font-size: 14px;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.source-picker__option-warn {
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+.source-picker__option-arrow {
+  align-self: center;
+  font-size: 22px;
+  color: var(--text-mute);
+  font-family: var(--mono);
+}
+.source-picker__option:hover:not(:disabled) .source-picker__option-arrow {
+  color: var(--accent);
+}
+
+.source-picker__remember {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.source-picker__remember input { accent-color: var(--accent); }
+
+.source-picker__status {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.1em;
+  min-height: 16px;
+}
+.source-picker__status[data-kind="error"] {
+  color: var(--warn);
 }
 
 /* -------------------------------------------------------------------------- */

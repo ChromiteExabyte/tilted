@@ -1,7 +1,14 @@
 import { L } from "./leaflet-setup";
-import { BridgeClient } from "./bridge-client";
 import { GestureInterpreter } from "./gestures";
-import type { BoardSample, GestureStatus, ModeChangeDetail, StatusChangeDetail } from "./types";
+import {
+  pickAndStartSource,
+  showPicker,
+  isSampleEvent,
+  isStatusEvent,
+  type SampleSource,
+} from "./sources";
+import { clearPreferredSource } from "./sources";
+import type { GestureStatus, ModeChangeDetail, StatusChangeDetail } from "./types";
 import "./style.css";
 
 const DEFAULT_CENTER: L.LatLngTuple = [49.0639, -81.0167]; // Cochrane, ON
@@ -48,7 +55,8 @@ const modeEl = $("mode");
 const phaseEl = $("phase");
 const weightEl = $("weight");
 const copDot = $("cop-dot");
-const connEl = $("conn");
+const connEl = $<HTMLButtonElement>("conn");
+const pickerRoot = $("picker-root");
 
 const PHASE_LABELS: Record<GestureStatus, string> = {
   DISCONNECTED: "—",
@@ -61,34 +69,52 @@ const setPhase = (status: GestureStatus): void => {
   statusEl.dataset.status = status;
 };
 
-// ---- Bridge + gestures ------------------------------------------------------
+// ---- Gestures + dynamic source ---------------------------------------------
 
-const bridge = new BridgeClient();
 const gestures = new GestureInterpreter();
+let currentSource: SampleSource | null = null;
 
-bridge.addEventListener("open", () => {
-  connEl.textContent = "● connected";
+function attachSource(source: SampleSource): void {
+  currentSource = source;
+  connEl.textContent = `● ${source.displayName}`;
   connEl.classList.add("ok");
-});
-bridge.addEventListener("close", () => {
-  connEl.textContent = "○ reconnecting";
-  connEl.classList.remove("ok");
-});
 
-bridge.addEventListener("sample", (evt) => {
-  const sample = (evt as CustomEvent<BoardSample>).detail;
-  gestures.onSample(sample);
+  source.addEventListener("sample", (evt) => {
+    if (!isSampleEvent(evt)) return;
+    const sample = evt.detail;
+    gestures.onSample(sample);
 
-  weightEl.textContent = sample.present ? `${sample.total_kg.toFixed(1)} kg` : "—";
+    weightEl.textContent = sample.present ? `${sample.total_kg.toFixed(1)} kg` : "—";
+    const offset = gestures.rezeroOffset;
+    const cx = sample.cop_x - offset.x;
+    const cy = sample.cop_y - offset.y;
+    copDot.style.left = `${((cx + 1) / 2) * 100}%`;
+    copDot.style.top = `${((1 - cy) / 2) * 100}%`;
+    copDot.classList.toggle("active", sample.present);
+  });
 
-  // COP -1..+1 → 0..100% (after applying the session offset so the dot
-  // visually centers when the player is at their natural standing posture).
-  const offset = gestures.rezeroOffset;
-  const cx = sample.cop_x - offset.x;
-  const cy = sample.cop_y - offset.y;
-  copDot.style.left = `${((cx + 1) / 2) * 100}%`;
-  copDot.style.top = `${((1 - cy) / 2) * 100}%`;
-  copDot.classList.toggle("active", sample.present);
+  source.addEventListener("statuschange", (evt) => {
+    if (!isStatusEvent(evt)) return;
+    const { status } = evt.detail;
+    if (status === "connected") {
+      connEl.textContent = `● ${source.displayName}`;
+      connEl.classList.add("ok");
+    } else if (status === "connecting") {
+      connEl.textContent = `○ ${source.displayName}`;
+      connEl.classList.remove("ok");
+    } else if (status === "disconnected") {
+      connEl.textContent = `○ reconnecting`;
+      connEl.classList.remove("ok");
+    }
+  });
+}
+
+connEl.addEventListener("click", async () => {
+  if (currentSource) currentSource.stop();
+  clearPreferredSource();
+  gestures.resetRezero();
+  const next = await showPicker(pickerRoot);
+  attachSource(next);
 });
 
 gestures.addEventListener("modechange", (evt) => {
@@ -100,6 +126,8 @@ gestures.addEventListener("statuschange", (evt) => {
   setPhase((evt as CustomEvent<StatusChangeDetail>).detail.to);
 });
 setPhase(gestures.status);
+
+void pickAndStartSource(pickerRoot).then(attachSource);
 
 // ---- Frame-rate command application -----------------------------------------
 
@@ -121,7 +149,7 @@ const tick = (now: number): void => {
 };
 requestAnimationFrame(tick);
 
-// ---- Keyboard fallback (for dev without the board) --------------------------
+// ---- Keyboard fallback ------------------------------------------------------
 
 document.addEventListener("keydown", (e) => {
   const step = 80;

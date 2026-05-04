@@ -1,9 +1,15 @@
 # balance-board-leaflet
 
 Pan and zoom a Leaflet map by standing on a Wii Balance Board.
-Standing-desk friendly. Linux host for the bridge, browser frontend, no cloud.
+Three connection modes — pick one from the in-page modal:
 
-Stretch mode: **BalanceGuessr** — GeoGuessr with satellite imagery instead of street view.
+- **Demo (simulator)** — synthetic samples cycle through every gesture. No hardware needed; works on any browser, any OS.
+- **Wii Balance Board (WebHID)** — direct browser → board on Chrome/Edge. Pair the board in OS Bluetooth, click Connect, no Python bridge required.
+- **Bridge server (WebSocket)** — connects to `balance_bridge.py` running on a Linux host (the original path).
+
+Your choice persists in localStorage. Click the connection pill in the topbar to change it.
+
+Stretch mode: **BalanceGuessr** — GeoGuessr with satellite imagery, 5-round game across Ontario, persistent best score.
 
 ## Gesture map
 
@@ -43,7 +49,32 @@ The bridge is a sensor driver — it does NOT know about gestures. Gesture
 classification, mode discrimination, and command synthesis all happen in the
 browser. Anyone can rewrite the gesture mapping without touching the bridge.
 
-## Quick start
+## Try it without hardware (90 seconds)
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+Open `http://localhost:5173/`, pick **Demo (simulator)** in the modal. The COP
+dot and gesture mode will animate through every state — pan, zoom, leg-lifts,
+pin gestures — so you can see the whole UI working without a board.
+
+## Connect a real board (Chrome / Edge)
+
+1. Pair the board via your OS Bluetooth settings (the red sync button is under
+   the battery cover).
+2. `npm run dev`, open the page, pick **Wii Balance Board (WebHID)**.
+3. Browser shows a device picker → select "Nintendo RVL-WBC-01" → done.
+
+The WebHID driver lives in [`web/src/sources/webhid.ts`](web/src/sources/webhid.ts)
+and follows the protocol at [wiibrew.org](https://wiibrew.org/wiki/Wii_Balance_Board).
+This path has been validated against the spec but not yet against real hardware
+in this codebase — errors during init surface in the picker as a descriptive
+message instead of failing silently.
+
+## Original Linux/bridge path
 
 ### 1. Pair the board
 
@@ -92,11 +123,15 @@ re-zero) works without the board.
 ## Tests
 
 ```
-make test            # bridge (pytest) + web (vitest), 46 tests total
-make test-bridge     # just the Python sensor math
-make test-web        # just the JS gesture interpreter
+make test            # bridge (pytest) + web (vitest), 74 tests total
+make test-bridge     # Python sensor math (22 tests)
+make test-web        # gesture interpreter, scoring, simulator (52 tests)
 make typecheck       # tsc --noEmit
 ```
+
+The simulator doubles as a test fixture: scripted scenarios drive the gesture
+interpreter through every mode without needing a board, so the full sample →
+gesture → command pipeline is covered.
 
 ## Layout
 
@@ -107,14 +142,26 @@ tests/               Python tests (compute_state)
 web/
   src/               TypeScript sources
     types.ts           BoardSample, PanZoomCommand, Mode, GestureStatus
-    bridge-client.ts   WebSocket client with auto-reconnect
+    sources/           Sample-source abstraction
+      types.ts           SampleSource interface, SourceStatus
+      base.ts            Shared status/event-dispatch base class
+      websocket.ts       Bridge-server source (WebSocket → balance_bridge.py)
+      simulator.ts       Synthetic-sample source (demo / test fixture)
+      webhid.ts          Direct browser-to-board source via WebHID
+      factory.ts         createSource(), localStorage helpers
+      picker.ts          Connection-picker modal UI
+      index.ts           Re-exports
     gestures.ts        Mode classifier + session re-zero + command synth
+    scoring.ts         Haversine + score curve + shuffle (BalanceGuessr)
     map.ts             Atlas mode entry point
     guesser.ts         BalanceGuessr entry point
     leaflet-setup.ts   Leaflet + bundled marker icons
     style.css          Shared field-instrument theme
-    locations.json     15 Northern Ontario targets
-  tests/             Vitest tests (gestures.test.ts)
+    locations.json     35 Ontario targets
+  tests/             Vitest suites
+    gestures.test.ts   Mode/command/pin/re-zero — 24 tests
+    scoring.test.ts    Haversine + score + shuffle — 17 tests
+    simulator.test.ts  Sample shape + scenario integration — 11 tests
   index.html         Vite entry — atlas
   guesser.html       Vite entry — BalanceGuessr
   vite.config.ts     Multi-page build + vitest config
@@ -129,7 +176,9 @@ Makefile             All commands (bridge + web)
 - [x] BalanceGuessr: random Northern Ontario locations, distance scoring
 - [x] Per-session re-zero (DISCONNECTED → REZEROING → READY)
 - [x] TypeScript with strict mode + Vitest unit tests
-- [ ] Tested on real hardware (your job — see `docs/calibration.md`)
+- [x] Source abstraction: simulator / WebHID / bridge, picker UI, persisted choice
+- [ ] WebHID validated against a real Balance Board (your job — protocol code is written)
+- [ ] Bridge tested on real hardware (your job — see `docs/calibration.md`)
 - [ ] Foot outline calibration mat
 
 ## License

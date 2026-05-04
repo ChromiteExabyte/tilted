@@ -1,31 +1,45 @@
-import type { BoardSample } from "./types";
+import type { BoardSample } from "../types";
+import { BaseSampleSource } from "./base";
+import type { SourceId } from "./types";
 
-export interface BridgeClientOptions {
+export interface WebSocketSourceOptions {
   url?: string;
   initialReconnectMs?: number;
   maxReconnectMs?: number;
 }
 
-export class BridgeClient extends EventTarget {
+/**
+ * Connects to the Python `balance_bridge.py` WebSocket. Auto-reconnects on
+ * close with exponential backoff. This is the original "bridge" path — Linux
+ * host with the board paired via bluez, JSON frames at ~30 Hz.
+ */
+export class WebSocketSource extends BaseSampleSource {
+  readonly id: SourceId = "websocket";
+  readonly displayName = "Bridge server";
   readonly url: string;
-  connected = false;
 
   private ws: WebSocket | null = null;
+  private reconnectTimer: number | null = null;
   private reconnectMs: number;
   private readonly initialReconnectMs: number;
   private readonly maxReconnectMs: number;
-  private reconnectTimer: number | null = null;
+  private stopped = false;
 
-  constructor(opts: BridgeClientOptions = {}) {
+  constructor(opts: WebSocketSourceOptions = {}) {
     super();
     this.url = opts.url ?? "ws://localhost:8765";
     this.initialReconnectMs = opts.initialReconnectMs ?? 500;
     this.maxReconnectMs = opts.maxReconnectMs ?? 5000;
     this.reconnectMs = this.initialReconnectMs;
+  }
+
+  async start(): Promise<void> {
+    this.stopped = false;
     this.connect();
   }
 
-  close(): void {
+  stop(): void {
+    this.stopped = true;
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -38,10 +52,13 @@ export class BridgeClient extends EventTarget {
       this.ws.close();
       this.ws = null;
     }
-    this.connected = false;
+    this.setStatus("disconnected");
   }
 
   private connect(): void {
+    if (this.stopped) return;
+    this.setStatus("connecting", `connecting to ${this.url}`);
+
     let socket: WebSocket;
     try {
       socket = new WebSocket(this.url);
@@ -52,9 +69,8 @@ export class BridgeClient extends EventTarget {
     this.ws = socket;
 
     socket.onopen = () => {
-      this.connected = true;
       this.reconnectMs = this.initialReconnectMs;
-      this.dispatchEvent(new Event("open"));
+      this.setStatus("connected");
     };
     socket.onmessage = (evt) => {
       let sample: BoardSample;
@@ -63,11 +79,10 @@ export class BridgeClient extends EventTarget {
       } catch {
         return;
       }
-      this.dispatchEvent(new CustomEvent<BoardSample>("sample", { detail: sample }));
+      this.emitSample(sample);
     };
     socket.onclose = () => {
-      this.connected = false;
-      this.dispatchEvent(new Event("close"));
+      if (!this.stopped) this.setStatus("disconnected");
       this.scheduleReconnect();
     };
     socket.onerror = () => {
@@ -76,7 +91,7 @@ export class BridgeClient extends EventTarget {
   }
 
   private scheduleReconnect(): void {
-    if (this.reconnectTimer !== null) return;
+    if (this.stopped || this.reconnectTimer !== null) return;
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       this.connect();

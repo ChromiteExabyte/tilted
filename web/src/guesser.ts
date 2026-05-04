@@ -1,5 +1,4 @@
 import { L } from "./leaflet-setup";
-import { BridgeClient } from "./bridge-client";
 import { GestureInterpreter } from "./gestures";
 import {
   PERFECT_SCORE,
@@ -11,7 +10,15 @@ import {
   scoreFor,
   shuffle,
 } from "./scoring";
-import type { BoardSample, GestureStatus, ModeChangeDetail, StatusChangeDetail } from "./types";
+import {
+  pickAndStartSource,
+  showPicker,
+  isSampleEvent,
+  isStatusEvent,
+  clearPreferredSource,
+  type SampleSource,
+} from "./sources";
+import type { GestureStatus, ModeChangeDetail, StatusChangeDetail } from "./types";
 import locationsData from "./locations.json";
 import "./style.css";
 
@@ -64,7 +71,8 @@ const ui = {
   summaryBest: $<HTMLSpanElement>("summary-best"),
   summaryNewBest: $<HTMLSpanElement>("summary-new-best"),
   summaryRows: $<HTMLDivElement>("summary-rounds"),
-  conn: $<HTMLDivElement>("conn"),
+  conn: $<HTMLButtonElement>("conn"),
+  pickerRoot: $<HTMLDivElement>("picker-root"),
 };
 
 const PHASE_LABELS: Record<GestureStatus, string> = {
@@ -117,23 +125,45 @@ let results: RoundResult[] = [];
 
 ui.best.textContent = `${bestScore} pts`;
 
-// ---- Bridge + gestures ------------------------------------------------------
+// ---- Source + gestures ------------------------------------------------------
 
-const bridge = new BridgeClient();
 const gestures = new GestureInterpreter();
+let currentSource: SampleSource | null = null;
 
-bridge.addEventListener("open", () => {
-  ui.conn.textContent = "● connected";
+function attachSource(source: SampleSource): void {
+  currentSource = source;
+  ui.conn.textContent = `● ${source.displayName}`;
   ui.conn.classList.add("ok");
-});
-bridge.addEventListener("close", () => {
-  ui.conn.textContent = "○ reconnecting";
-  ui.conn.classList.remove("ok");
+
+  source.addEventListener("sample", (evt) => {
+    if (!isSampleEvent(evt)) return;
+    gestures.onSample(evt.detail);
+  });
+  source.addEventListener("statuschange", (evt) => {
+    if (!isStatusEvent(evt)) return;
+    const { status } = evt.detail;
+    if (status === "connected") {
+      ui.conn.textContent = `● ${source.displayName}`;
+      ui.conn.classList.add("ok");
+    } else if (status === "connecting") {
+      ui.conn.textContent = `○ ${source.displayName}`;
+      ui.conn.classList.remove("ok");
+    } else if (status === "disconnected") {
+      ui.conn.textContent = `○ reconnecting`;
+      ui.conn.classList.remove("ok");
+    }
+  });
+}
+
+ui.conn.addEventListener("click", async () => {
+  if (currentSource) currentSource.stop();
+  clearPreferredSource();
+  gestures.resetRezero();
+  const next = await showPicker(ui.pickerRoot);
+  attachSource(next);
 });
 
-bridge.addEventListener("sample", (evt) => {
-  gestures.onSample((evt as CustomEvent<BoardSample>).detail);
-});
+void pickAndStartSource(ui.pickerRoot).then(attachSource);
 
 gestures.addEventListener("guesspin", () => advance());
 gestures.addEventListener("modechange", (evt) => {
