@@ -1,25 +1,45 @@
 {
   "regions": [
     {
-      "name": "Northern Ontario",
-      "bounds": { "north": 51.5, "south": 47.5, "west": -87.5, "east": -78.5 }
+      "name": "Ontario",
+      "bounds": { "north": 56.86, "south": 41.68, "west": -95.16, "east": -74.34 }
     }
   ],
   "locations": [
+    { "name": "CN Tower", "lat": 43.6426, "lon": -79.3871, "category": "landmark", "hint": "553 m communications tower in downtown Toronto." },
+    { "name": "Toronto Islands", "lat": 43.6234, "lon": -79.3776, "category": "natural", "hint": "Sandbar archipelago across from Toronto's harbour." },
+    { "name": "Pearson Airport", "lat": 43.6777, "lon": -79.6248, "category": "landmark", "hint": "Toronto's main international airport, Mississauga." },
+    { "name": "Distillery District", "lat": 43.6504, "lon": -79.3593, "category": "landmark", "hint": "Pedestrian Victorian-industrial precinct in east downtown Toronto." },
+    { "name": "Parliament Hill", "lat": 45.4236, "lon": -75.7009, "category": "landmark", "hint": "Federal seat of Canadian government, Ottawa." },
+    { "name": "Rideau Canal locks (Smiths Falls)", "lat": 44.9020, "lon": -76.0167, "category": "landmark", "hint": "Combined locks on the UNESCO Rideau Canal." },
+    { "name": "Niagara Horseshoe Falls", "lat": 43.0796, "lon": -79.0747, "category": "natural", "hint": "Curving waterfall on the Canadian side of the Niagara River." },
+    { "name": "Welland Canal locks", "lat": 43.0156, "lon": -79.2089, "category": "landmark", "hint": "Ship canal between Lake Ontario and Lake Erie." },
+    { "name": "Stelco Hamilton", "lat": 43.2603, "lon": -79.7799, "category": "industrial", "hint": "Steelworks on Hamilton harbour." },
+    { "name": "Point Pelee tip", "lat": 41.9089, "lon": -82.5095, "category": "natural", "hint": "Southernmost point of mainland Canada." },
+    { "name": "Sarnia petrochemical row", "lat": 42.9994, "lon": -82.4072, "category": "industrial", "hint": "Refineries and chemical plants along the St Clair River." },
+    { "name": "Stratford Festival theatre", "lat": 43.3697, "lon": -80.9821, "category": "landmark", "hint": "Avon River theatre town." },
+    { "name": "Tobermory (Big Tub)", "lat": 45.2569, "lon": -81.6647, "category": "town", "hint": "Town at the tip of the Bruce Peninsula." },
+    { "name": "Flowerpot Island", "lat": 45.3086, "lon": -81.6175, "category": "natural", "hint": "Sea-stack island in Fathom Five National Marine Park." },
+    { "name": "Fort Henry, Kingston", "lat": 44.2278, "lon": -76.4664, "category": "landmark", "hint": "19th-century fortification overlooking Lake Ontario." },
+    { "name": "Thousand Islands Bridge", "lat": 44.3500, "lon": -75.9500, "category": "landmark", "hint": "International bridge over the St Lawrence near Brockville." },
+    { "name": "Peterborough Lift Lock", "lat": 44.3083, "lon": -78.3000, "category": "landmark", "hint": "World's tallest hydraulic lift lock on the Trent–Severn." },
+    { "name": "Algonquin — Canoe Lake", "lat": 45.5189, "lon": -78.6997, "category": "natural", "hint": "Tom Thomson's lake in Algonquin Provincial Park." },
+    { "name": "Wasaga Beach", "lat": 44.5167, "lon": -80.0167, "category": "town", "hint": "World's longest freshwater beach on Georgian Bay." },
+    { "name": "Western University quad", "lat": 43.0096, "lon": -81.2737, "category": "landmark", "hint": "Main campus, London, Ontario." },
     { "name": "Hollinger Open Pit", "lat": 48.4760, "lon": -81.3260, "category": "mine", "hint": "Reclaimed open pit on the edge of Timmins." },
     { "name": "Kidd Mine headframe", "lat": 48.6926, "lon": -81.3676, "category": "mine", "hint": "World's deepest base-metal mine, north of Timmins." },
     { "name": "Adams Mine pits", "lat": 47.9250, "lon": -80.0200, "category": "mine", "hint": "Iron mine pits east of Kirkland Lake." },
     { "name": "Detour Lake Mine", "lat": 50.0260, "lon": -79.7370, "category": "mine", "hint": "Open-pit gold mine near the Quebec border." },
+    { "name": "Sudbury Big Nickel", "lat": 46.4769, "lon": -81.0250, "category": "landmark", "hint": "9 m nickel coin landmark." },
     { "name": "Cochrane railway yard", "lat": 49.0666, "lon": -81.0149, "category": "town", "hint": "Northlander junction town." },
     { "name": "Moosonee", "lat": 51.2719, "lon": -80.6444, "category": "town", "hint": "End of the Polar Bear Express line." },
     { "name": "Smooth Rock Falls", "lat": 49.2667, "lon": -81.6333, "category": "town", "hint": "Mattagami River paper-mill town." },
     { "name": "Iroquois Falls", "lat": 48.7667, "lon": -80.6833, "category": "town", "hint": "Abitibi River mill town." },
+    { "name": "Kapuskasing town circle", "lat": 49.4167, "lon": -82.4333, "category": "town", "hint": "Planned company town with a circular street pattern." },
+    { "name": "Hearst", "lat": 49.6833, "lon": -83.6667, "category": "town", "hint": "Francophone forestry town on Highway 11." },
     { "name": "Lady Evelyn Falls", "lat": 47.3522, "lon": -80.3483, "category": "natural", "hint": "Falls in Lady Evelyn-Smoothwater Park." },
     { "name": "Ouimet Canyon", "lat": 48.8000, "lon": -88.6667, "category": "natural", "hint": "150 m deep canyon NE of Thunder Bay." },
     { "name": "Greenwater Lake", "lat": 49.3000, "lon": -82.4000, "category": "natural", "hint": "Greenwater Provincial Park, west of Cochrane." },
-    { "name": "Kapuskasing town circle", "lat": 49.4167, "lon": -82.4333, "category": "town", "hint": "Planned company town with a circular street pattern." },
-    { "name": "Hearst", "lat": 49.6833, "lon": -83.6667, "category": "town", "hint": "Francophone forestry town on Highway 11." },
-    { "name": "Wawa Goose", "lat": 47.9956, "lon": -84.7714, "category": "landmark", "hint": "Giant goose statue on Highway 17." },
-    { "name": "Sudbury Big Nickel", "lat": 46.4769, "lon": -81.0250, "category": "landmark", "hint": "9 m nickel coin landmark." }
+    { "name": "Wawa Goose", "lat": 47.9956, "lon": -84.7714, "category": "landmark", "hint": "Giant goose statue on Highway 17." }
   ]
 }

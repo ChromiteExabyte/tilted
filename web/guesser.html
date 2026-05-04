@@ -11,10 +11,11 @@
 <body>
   <div class="topbar">
     <div class="brand">balance<small>GUESSR</small></div>
-    <div><span class="label">round</span><span class="value" id="round">round 1</span></div>
+    <div><span class="label">round</span><span class="value" id="round">round 1 of 5</span></div>
     <div><span class="label">stage</span><span class="value" id="game-mode">STUDY</span></div>
     <div><span class="label">phase</span><span class="value" id="phase">—</span></div>
     <div><span class="label">score</span><span class="value" id="score">0 pts</span></div>
+    <div><span class="label">best</span><span class="value" id="best">0 pts</span></div>
     <div><a href="/index.html" style="color:var(--text-dim);text-decoration:none;letter-spacing:0.2em;">← ATLAS</a></div>
     <div id="conn">○ connecting</div>
   </div>
@@ -46,6 +47,30 @@
     </div>
     <div class="reveal-cta">
       pin gesture or <kbd>G</kbd> · next round
+    </div>
+  </div>
+
+  <div id="summary" class="hidden">
+    <div class="summary-header">
+      <div>
+        <div class="summary-title">Game complete</div>
+        <span class="summary-sub">5 rounds · across Ontario</span>
+      </div>
+      <div class="summary-totals">
+        <div class="summary-totals-cell">
+          <span class="k">total</span>
+          <span class="v" id="summary-total">—</span>
+        </div>
+        <div class="summary-totals-cell">
+          <span class="k">best</span>
+          <span class="v" id="summary-best">—</span>
+        </div>
+        <div class="summary-newbest hidden" id="summary-new-best">★ new best</div>
+      </div>
+    </div>
+    <div class="summary-rounds" id="summary-rounds"></div>
+    <div class="summary-cta">
+      pin gesture or <kbd>G</kbd> · new game
     </div>
   </div>
 

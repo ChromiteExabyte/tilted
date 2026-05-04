@@ -1,6 +1,16 @@
 import { L } from "./leaflet-setup";
 import { BridgeClient } from "./bridge-client";
 import { GestureInterpreter } from "./gestures";
+import {
+  PERFECT_SCORE,
+  ROUNDS_PER_GAME,
+  formatDistance,
+  haversineKm,
+  loadBestScore,
+  saveBestScore,
+  scoreFor,
+  shuffle,
+} from "./scoring";
 import type { BoardSample, GestureStatus, ModeChangeDetail, StatusChangeDetail } from "./types";
 import locationsData from "./locations.json";
 import "./style.css";
@@ -13,15 +23,22 @@ interface Location {
   hint: string;
 }
 
+interface RoundResult {
+  target: Location;
+  distKm: number;
+  score: number;
+}
+
 const LOCATIONS = locationsData.locations as Location[];
 
 const STUDY_ZOOM_MIN = 11;
 const STUDY_ZOOM_MAX = 18;
 const STUDY_INITIAL_ZOOM = 14;
 const GUESS_INITIAL_ZOOM = 5;
-const GUESS_CENTER: L.LatLngTuple = [49.5, -82.0];
+const GUESS_CENTER: L.LatLngTuple = [49.5, -82.0]; // roughly the geometric centre of Ontario
+const TARGET_JITTER_DEG = 0.05;
 
-type GameState = "STUDY" | "GUESS" | "REVEAL";
+type GameState = "STUDY" | "GUESS" | "REVEAL" | "SUMMARY";
 
 const $ = <T extends HTMLElement>(id: string): T => {
   const el = document.getElementById(id);
@@ -33,6 +50,7 @@ const ui = {
   mode: $<HTMLSpanElement>("game-mode"),
   round: $<HTMLSpanElement>("round"),
   score: $<HTMLSpanElement>("score"),
+  best: $<HTMLSpanElement>("best"),
   phase: $<HTMLSpanElement>("phase"),
   revealName: $<HTMLDivElement>("reveal-name"),
   revealHint: $<HTMLSpanElement>("reveal-hint"),
@@ -41,6 +59,11 @@ const ui = {
   revealPanel: $<HTMLDivElement>("reveal"),
   studyPanel: $<HTMLDivElement>("study-panel"),
   guessPanel: $<HTMLDivElement>("guess-panel"),
+  summaryPanel: $<HTMLDivElement>("summary"),
+  summaryTotal: $<HTMLSpanElement>("summary-total"),
+  summaryBest: $<HTMLSpanElement>("summary-best"),
+  summaryNewBest: $<HTMLSpanElement>("summary-new-best"),
+  summaryRows: $<HTMLDivElement>("summary-rounds"),
   conn: $<HTMLDivElement>("conn"),
 };
 
@@ -85,9 +108,14 @@ let connectorLine: L.Polyline | null = null;
 // ---- Game state -------------------------------------------------------------
 
 let state: GameState = "STUDY";
-let target: Location | null = null;
 let round = 0;
 let totalScore = 0;
+let bestScore = loadBestScore();
+let pool: Location[] = [];
+let target: Location | null = null;
+let results: RoundResult[] = [];
+
+ui.best.textContent = `${bestScore} pts`;
 
 // ---- Bridge + gestures ------------------------------------------------------
 
@@ -109,12 +137,9 @@ bridge.addEventListener("sample", (evt) => {
 
 gestures.addEventListener("guesspin", () => advance());
 gestures.addEventListener("modechange", (evt) => {
-  // Mirror the mode into the phase pill while in active play, but don't
-  // overwrite REVEAL or the calibrating message.
-  if (state === "REVEAL") return;
-  const detail = (evt as CustomEvent<ModeChangeDetail>).detail;
+  if (state === "REVEAL" || state === "SUMMARY") return;
   if (gestures.status === "REZEROING") return;
-  ui.phase.textContent = detail.to.toLowerCase();
+  ui.phase.textContent = (evt as CustomEvent<ModeChangeDetail>).detail.to.toLowerCase();
 });
 gestures.addEventListener("statuschange", (evt) => {
   ui.phase.textContent = PHASE_LABELS[(evt as CustomEvent<StatusChangeDetail>).detail.to];
@@ -129,7 +154,7 @@ let lastT = performance.now();
 const tick = (now: number): void => {
   const dt = (now - lastT) / 1000;
   lastT = now;
-  if (state !== "REVEAL") {
+  if (state === "STUDY" || state === "GUESS") {
     const cmd = gestures.command;
     const m = state === "STUDY" ? studyMap : guessMap;
     if (cmd.panX || cmd.panY) {
@@ -148,27 +173,38 @@ requestAnimationFrame(tick);
 
 // ---- Game flow --------------------------------------------------------------
 
-function pickTarget(): Location {
-  const idx = Math.floor(Math.random() * LOCATIONS.length);
-  return LOCATIONS[idx]!;
+function newGame(): void {
+  pool = shuffle(LOCATIONS);
+  results = [];
+  totalScore = 0;
+  round = 0;
+  ui.score.textContent = "0 pts";
+  ui.summaryPanel.classList.add("hidden");
+  startRound();
 }
 
 function startRound(): void {
-  round += 1;
-  target = pickTarget();
-  ui.round.textContent = `round ${round}`;
-  if (guessMarker)    { guessMap.removeLayer(guessMarker);    guessMarker = null; }
-  if (targetMarker)   { guessMap.removeLayer(targetMarker);   targetMarker = null; }
-  if (connectorLine)  { guessMap.removeLayer(connectorLine);  connectorLine = null; }
+  if (pool.length === 0) {
+    // Defensive: shouldn't happen with N <= LOCATIONS.length, but reshuffle if so.
+    pool = shuffle(LOCATIONS);
+  }
+  round = results.length + 1;
+  target = pool.pop()!;
+  ui.round.textContent = `round ${round} of ${ROUNDS_PER_GAME}`;
+  clearRoundLayers();
 
-  // Drop into study mode at the target with a small offset, high zoom.
-  const jitterDeg = 0.05;
-  const lat = target.lat + (Math.random() - 0.5) * jitterDeg;
-  const lon = target.lon + (Math.random() - 0.5) * jitterDeg;
+  const lat = target.lat + (Math.random() - 0.5) * TARGET_JITTER_DEG;
+  const lon = target.lon + (Math.random() - 0.5) * TARGET_JITTER_DEG;
   studyMap.setView([lat, lon], STUDY_INITIAL_ZOOM, { animate: false });
   guessMap.setView(GUESS_CENTER, GUESS_INITIAL_ZOOM, { animate: false });
   switchTo("STUDY");
   ui.revealPanel.classList.add("hidden");
+}
+
+function clearRoundLayers(): void {
+  if (guessMarker)   { guessMap.removeLayer(guessMarker);   guessMarker = null; }
+  if (targetMarker)  { guessMap.removeLayer(targetMarker);  targetMarker = null; }
+  if (connectorLine) { guessMap.removeLayer(connectorLine); connectorLine = null; }
 }
 
 function switchTo(next: GameState): void {
@@ -194,6 +230,8 @@ function commitGuess(): void {
   const guess = guessMap.getCenter();
   const distKm = haversineKm(guess.lat, guess.lng, target.lat, target.lon);
   const score = scoreFor(distKm);
+
+  results.push({ target, distKm, score });
   totalScore += score;
   ui.score.textContent = `${totalScore} pts`;
 
@@ -216,53 +254,77 @@ function commitGuess(): void {
 
   ui.revealName.textContent = target.name;
   ui.revealHint.textContent = target.hint ?? "";
-  ui.revealDist.textContent = distKm < 1
-    ? `${(distKm * 1000).toFixed(0)} m`
-    : `${distKm.toFixed(1)} km`;
+  ui.revealDist.textContent = formatDistance(distKm);
   ui.revealScore.textContent = `+${score} pts`;
   ui.revealPanel.classList.remove("hidden");
   state = "REVEAL";
   ui.mode.textContent = "REVEAL";
 }
 
-function advance(): void {
-  if (state === "STUDY") {
-    switchTo("GUESS");
-  } else if (state === "GUESS") {
-    commitGuess();
-  } else {
-    startRound();
+function showSummary(): void {
+  state = "SUMMARY";
+  ui.mode.textContent = "SUMMARY";
+  ui.revealPanel.classList.add("hidden");
+
+  const isNewBest = totalScore > bestScore;
+  if (isNewBest) {
+    bestScore = totalScore;
+    saveBestScore(bestScore);
   }
+  ui.best.textContent = `${bestScore} pts`;
+  ui.summaryTotal.textContent = `${totalScore} pts`;
+  ui.summaryBest.textContent = `${bestScore} pts`;
+  ui.summaryNewBest.classList.toggle("hidden", !isNewBest);
+
+  ui.summaryRows.innerHTML = "";
+  for (let i = 0; i < results.length; i++) {
+    const r = results[i]!;
+    const row = document.createElement("div");
+    row.className = "summary-row";
+    row.innerHTML = `
+      <span class="r-num">${i + 1}</span>
+      <span class="r-name">${escapeHtml(r.target.name)}</span>
+      <span class="r-dist">${formatDistance(r.distKm)}</span>
+      <span class="r-score">${r.score === PERFECT_SCORE ? "★ " : ""}${r.score}</span>
+    `;
+    ui.summaryRows.appendChild(row);
+  }
+  ui.summaryPanel.classList.remove("hidden");
 }
 
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371;
-  const toRad = (d: number) => (d * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(a));
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-function scoreFor(km: number): number {
-  // 5000 at 0 km, exponential falloff with 250 km characteristic distance.
-  return Math.max(0, Math.round(5000 * Math.exp(-km / 250)));
+function advance(): void {
+  switch (state) {
+    case "STUDY":
+      switchTo("GUESS");
+      break;
+    case "GUESS":
+      commitGuess();
+      break;
+    case "REVEAL":
+      if (results.length >= ROUNDS_PER_GAME) showSummary();
+      else startRound();
+      break;
+    case "SUMMARY":
+      newGame();
+      break;
+  }
 }
 
 // ---- Keyboard fallback ------------------------------------------------------
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "g" || e.key === "G") {
-    advance();
-    return;
-  }
-  if (e.key === "r" || e.key === "R") {
-    gestures.resetRezero();
-    return;
-  }
-  if (state === "REVEAL") return;
+  if (e.key === "g" || e.key === "G") { advance(); return; }
+  if (e.key === "r" || e.key === "R") { gestures.resetRezero(); return; }
+  if (state === "REVEAL" || state === "SUMMARY") return;
   const m = state === "STUDY" ? studyMap : guessMap;
   const step = 60;
   switch (e.key) {
@@ -278,4 +340,4 @@ document.addEventListener("keydown", (e) => {
 
 // ---- Boot -------------------------------------------------------------------
 
-startRound();
+newGame();
