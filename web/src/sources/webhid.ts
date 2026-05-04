@@ -22,6 +22,7 @@ const WIIMOTE_PRODUCT_IDS = [0x0306, 0x0330] as const;
 const REPORT_SET_REPORTING = 0x12;
 const REPORT_WRITE_REGISTER = 0x16;
 const REPORT_READ_REGISTER = 0x17;
+const REPORT_WRITE_ACK = 0x22;
 const REPORT_READ_RESPONSE = 0x21;
 const REPORT_DATA_CORE_EXT8 = 0x32;
 
@@ -90,6 +91,8 @@ export class WebHIDSource extends BaseSampleSource {
   private calibrationBuffer: Uint8Array = new Uint8Array(0);
   private calibrationResolve: ((cal: BoardCalibration) => void) | null = null;
   private calibrationReject: ((err: Error) => void) | null = null;
+  private writeAckResolve: (() => void) | null = null;
+  private writeAckReject: ((err: Error) => void) | null = null;
 
   static isSupported(): boolean {
     return "hid" in navigator && typeof (navigator as NavigatorWithHID).hid?.requestDevice === "function";
@@ -148,6 +151,8 @@ export class WebHIDSource extends BaseSampleSource {
     }
     this.device = null;
     this.calibration = null;
+    this.writeAckResolve = null;
+    this.writeAckReject = null;
   }
 
   private attachInputHandler(): void {
@@ -159,24 +164,38 @@ export class WebHIDSource extends BaseSampleSource {
   private async initExtension(): Promise<void> {
     if (!this.device) throw new Error("No device");
     await this.writeRegister(EXT_INIT_ADDR_1, EXT_INIT_VALUE_1);
-    await delay(40);
+    await delay(100);
     await this.writeRegister(EXT_INIT_ADDR_2, EXT_INIT_VALUE_2);
-    await delay(40);
+    await delay(100);
   }
 
   private writeRegister(address24: number, value: number): Promise<void> {
     if (!this.device) return Promise.reject(new Error("No device"));
     // Output report 0x16 layout (after the report ID, sent as `data`):
     //   [space, addr_hi, addr_mid, addr_lo, length, data0..data15]
-    // total = 21 bytes; `data` therefore is 20 bytes.
-    const buf = new Uint8Array(20);
+    const buf = new Uint8Array(21);
     buf[0] = 0x04; // 0x04 = control register space (a4xxxx)
     buf[1] = (address24 >> 16) & 0xff;
     buf[2] = (address24 >> 8) & 0xff;
     buf[3] = address24 & 0xff;
     buf[4] = 1; // length
     buf[5] = value & 0xff;
-    return this.device.sendReport(REPORT_WRITE_REGISTER, buf);
+    // Await a 0x22 write-ack so we know the write landed before proceeding.
+    const ackPromise = new Promise<void>((resolve, reject) => {
+      this.writeAckResolve = resolve;
+      this.writeAckReject = reject;
+      window.setTimeout(() => {
+        if (this.writeAckReject) {
+          // Some firmware doesn't send 0x22 — treat timeout as OK.
+          console.warn("[WBB] no write-ack within 500 ms, continuing anyway");
+          this.writeAckResolve?.();
+          this.writeAckResolve = null;
+          this.writeAckReject = null;
+        }
+      }, 500);
+    });
+    void this.device.sendReport(REPORT_WRITE_REGISTER, buf);
+    return ackPromise;
   }
 
   private readCalibration(): Promise<BoardCalibration> {
@@ -185,14 +204,14 @@ export class WebHIDSource extends BaseSampleSource {
     const promise = new Promise<BoardCalibration>((resolve, reject) => {
       this.calibrationResolve = resolve;
       this.calibrationReject = reject;
-      // Safety net — if the device doesn't respond within 2 s, give up.
+      // Safety net — if the device doesn't respond within 5 s, give up.
       window.setTimeout(() => {
         if (this.calibrationReject) {
-          this.calibrationReject(new Error("Timed out waiting for calibration response"));
+          this.calibrationReject(new Error("Timed out waiting for calibration response (5 s). Open DevTools console for raw report log."));
           this.calibrationResolve = null;
           this.calibrationReject = null;
         }
-      }, 2000);
+      }, 5000);
     });
 
     // Output report 0x17 layout: [space, addr_hi, addr_mid, addr_lo, len_hi, len_lo]
@@ -218,37 +237,87 @@ export class WebHIDSource extends BaseSampleSource {
 
   private onInputReport(evt: HIDInputReportEventLike): void {
     const { reportId, data } = evt;
-    if (reportId === REPORT_READ_RESPONSE) {
+    // Log every report so we can diagnose protocol issues (visible in DevTools console).
+    const hex = (n: number) => n.toString(16).padStart(2, "0");
+    const rawHex = Array.from({ length: Math.min(data.byteLength, 21) }, (_, i) =>
+      hex(data.getUint8(i))
+    ).join(" ");
+    console.log(`[WBB] report 0x${hex(reportId)} (${data.byteLength}B): ${rawHex}`);
+
+    if (reportId === REPORT_WRITE_ACK) {
+      this.handleWriteAck(data);
+    } else if (reportId === REPORT_READ_RESPONSE) {
       this.handleReadResponse(data);
     } else if (reportId === REPORT_DATA_CORE_EXT8 && this.calibration) {
       this.handleSensorReport(data);
     }
   }
 
+  // Report 0x22 — write register acknowledgment.
+  // Layout: [btn0, btn1, reportId_acked, error_nibble<<4]
+  private handleWriteAck(data: DataView): void {
+    const error = data.byteLength >= 4 ? (data.getUint8(3) >> 4) & 0x0f : 0;
+    if (error !== 0) {
+      console.warn(`[WBB] write ack error 0x${error.toString(16)}`);
+      this.writeAckReject?.(new Error(`Write register failed (ack error 0x${error.toString(16)})`));
+    } else {
+      this.writeAckResolve?.();
+    }
+    this.writeAckResolve = null;
+    this.writeAckReject = null;
+  }
+
   /**
    * Input report 0x21 layout (after the 0x21 report-ID byte, presented as DataView):
    *   [btn0, btn1, error_size, addr_hi, addr_lo, data0..data15]
-   * - error_size: high nibble = error (0 = OK, 7 = address out of range, etc.)
-   *               low nibble = bytes-1 of payload (0..15 for 1..16 bytes)
+   * - error_size: high nibble = error (0 = OK, 7 = address out of range)
+   *               low nibble = bytes-1 of payload (0..15 → 1..16 bytes)
    * - addr_hi/lo: low 16 bits of source address; we requested 0xa40024 so the
    *               first chunk has 0x0024 and the second 0x0034 (for our 24 byte read).
    * The 24-byte calibration arrives in two 16-byte chunks.
+   *
+   * Note: Wiimote button bytes are active-low (0xFF = nothing pressed). We
+   * auto-detect whether button bytes are present by probing both offsets.
    */
   private handleReadResponse(data: DataView): void {
-    if (data.byteLength < 5) return;
-    const errorSize = data.getUint8(2);
+    if (data.byteLength < 4) return;
+
+    // Determine byte offset: spec says [btn0, btn1, error_size, addr_hi, addr_lo, ...].
+    // If the high nibble at offset 2 is non-zero, try offset 0 as a fallback
+    // (some firmware/OS combinations omit the 2 button bytes).
+    let base = 2; // standard: skip 2 button bytes
+    if (data.byteLength >= 3) {
+      const nibbleAt2 = (data.getUint8(2) >> 4) & 0x0f;
+      const nibbleAt0 = (data.getUint8(0) >> 4) & 0x0f;
+      if (nibbleAt2 !== 0 && nibbleAt0 === 0) {
+        console.warn(`[WBB] 0x21 error nibble at offset 2 = 0x${nibbleAt2.toString(16)}; retrying at offset 0 (nibble=0x${nibbleAt0.toString(16)})`);
+        base = 0;
+      }
+    }
+
+    if (data.byteLength < base + 3) return;
+    const errorSize = data.getUint8(base);
     const error = (errorSize >> 4) & 0x0f;
     if (error !== 0) {
-      this.failCalibration(`Read error 0x${error.toString(16)} from device`);
+      const allBytes = Array.from({ length: data.byteLength }, (_, i) =>
+        data.getUint8(i).toString(16).padStart(2, "0")
+      ).join(" ");
+      const msg = `Read error 0x${error.toString(16)} (base=${base}, byte[${base}]=0x${errorSize.toString(16)}). `
+        + `Open DevTools console (F12) for full log. Raw: ${allBytes}`;
+      console.error(`[WBB] calibration read failed: ${msg}`);
+      this.failCalibration(msg);
       return;
     }
     const payloadLen = (errorSize & 0x0f) + 1;
-    const addrLow = data.getUint16(3);
+    const addrLow = data.getUint16(base + 1);
     // Locate this chunk inside our 24-byte calibration buffer.
     const offset = addrLow - (CALIBRATION_ADDR & 0xffff);
-    if (offset < 0 || offset + payloadLen > CALIBRATION_LENGTH) return;
+    if (offset < 0 || offset + payloadLen > CALIBRATION_LENGTH) {
+      console.warn(`[WBB] 0x21 chunk out of range: addrLow=0x${addrLow.toString(16)} offset=${offset} len=${payloadLen}`);
+      return;
+    }
     for (let i = 0; i < payloadLen; i++) {
-      this.calibrationBuffer[offset + i] = data.getUint8(5 + i);
+      this.calibrationBuffer[offset + i] = data.getUint8(base + 3 + i);
     }
     if (offset + payloadLen >= CALIBRATION_LENGTH) {
       this.completeCalibration();
