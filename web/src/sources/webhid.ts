@@ -163,10 +163,37 @@ export class WebHIDSource extends BaseSampleSource {
 
   private async initExtension(): Promise<void> {
     if (!this.device) throw new Error("No device");
+    // Try new-style init (non-encrypted, 0x55 + 0x00).
+    // If that fails, fallback to old-style (just 0x00 to 0xa40040).
+    this.tryOldInit = false;
     await this.writeRegister(EXT_INIT_ADDR_1, EXT_INIT_VALUE_1);
     await delay(100);
     await this.writeRegister(EXT_INIT_ADDR_2, EXT_INIT_VALUE_2);
     await delay(100);
+  }
+
+  private tryOldInit = false;
+
+  private async retryWithOldInit(): Promise<void> {
+    if (!this.device) return;
+    console.log("[WBB] attempting old-style extension init (0x00 to 0xa40040)");
+    try {
+      // Old-style: single write of 0x00 to 0xa40040.
+      await this.writeRegister(0xa40040, 0x00);
+      await delay(100);
+      // Re-request calibration.
+      const buf = new Uint8Array(6);
+      buf[0] = 0x04;
+      buf[1] = (CALIBRATION_ADDR >> 16) & 0xff;
+      buf[2] = (CALIBRATION_ADDR >> 8) & 0xff;
+      buf[3] = CALIBRATION_ADDR & 0xff;
+      buf[4] = (CALIBRATION_LENGTH >> 8) & 0xff;
+      buf[5] = CALIBRATION_LENGTH & 0xff;
+      void this.device.sendReport(REPORT_READ_REGISTER, buf);
+    } catch (err) {
+      console.error(`[WBB] old-style init failed: ${err}`);
+      this.failCalibration(`Old-style init failed: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   private writeRegister(address24: number, value: number): Promise<void> {
@@ -299,6 +326,16 @@ export class WebHIDSource extends BaseSampleSource {
     const errorSize = data.getUint8(base);
     const error = (errorSize >> 4) & 0x0f;
     if (error !== 0) {
+      // Error 0x7 = "address not found" — extension not initialized.
+      // Try old-style init (single 0x00 write to 0xa40040) as fallback.
+      if ((error === 0x7 || error === 0xf) && !this.tryOldInit) {
+        console.warn(`[WBB] error 0x${error.toString(16)} (address not found); retrying with old-style init`);
+        this.tryOldInit = true;
+        this.calibrationBuffer = new Uint8Array(24);
+        // Retry: old-style init, then read again.
+        void this.retryWithOldInit();
+        return;
+      }
       const allBytes = Array.from({ length: data.byteLength }, (_, i) =>
         data.getUint8(i).toString(16).padStart(2, "0")
       ).join(" ");
