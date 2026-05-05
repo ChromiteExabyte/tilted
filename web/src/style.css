@@ -237,6 +237,17 @@ body::after {
 #conn { margin-left: auto; color: var(--text-mute); }
 #conn.ok { color: #1a7a2e; }
 
+.topbar-link {
+  color: var(--text-dim);
+  text-decoration: none;
+  letter-spacing: 0.18em;
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 11px;
+  transition: color 0.15s;
+}
+.topbar-link:hover { color: var(--aqua-4); }
+
 /* Glossy aqua-style button (Aqua / Vista) */
 .conn-button {
   font: inherit;
@@ -358,13 +369,55 @@ body::after {
 [data-status="REZEROING"] {
   animation: rezero-pulse 1.6s ease-in-out infinite;
 }
-[data-status="REZEROING"] .label-tag.bottom::after {
-  content: " · calibrating";
-  color: var(--aqua-4);
-}
 @keyframes rezero-pulse {
   0%, 100% { box-shadow: var(--glass-shadow), var(--glass-inner); }
   50%      { box-shadow: var(--glass-shadow), var(--glass-inner), 0 0 0 4px rgba(77,208,225,0.45), 0 0 24px rgba(14,165,199,0.55); }
+}
+
+/* Calibration overlay: friendlier than appending "· calibrating" to a tiny label.
+   Shows a labeled progress bar over the COP pad while REZEROING. */
+.cop-rezero-overlay {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 16px;
+  background: linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(207,235,255,0.75) 100%);
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 2;
+}
+[data-status="REZEROING"] .cop-rezero-overlay { display: flex; }
+.cop-rezero-overlay__label {
+  font-family: var(--display);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--aqua-4);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(255,255,255,0.8);
+}
+.cop-rezero-overlay__bar {
+  width: 80%;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(13, 71, 117, 0.18);
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(13, 71, 117, 0.25);
+}
+.cop-rezero-overlay__fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--aqua-2), var(--aqua-3) 50%, var(--aqua-4));
+  box-shadow: 0 0 8px rgba(14, 165, 199, 0.6);
+  animation: rezero-fill 2s ease-out forwards;
+}
+@keyframes rezero-fill {
+  from { width: 0%; }
+  to   { width: 100%; }
 }
 
 /* -------------------------------------------------------------------------- */

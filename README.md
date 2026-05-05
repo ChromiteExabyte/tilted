@@ -1,6 +1,9 @@
-# balance-board-leaflet
+# Tilted
 
-Pan and zoom a Leaflet map by standing on a Wii Balance Board.
+Pan and zoom a map by standing on a Wii Balance Board. Lean to steer,
+lift a leg to zoom, bob to control speed. Includes **BalanceGuessr** —
+a body-controlled GeoGuessr clone over Ontario satellite imagery.
+
 Three connection modes — pick one from the in-page modal:
 
 - **Demo (simulator)** — synthetic samples cycle through every gesture. No hardware needed; works on any browser, any OS.
@@ -9,7 +12,8 @@ Three connection modes — pick one from the in-page modal:
 
 Your choice persists in localStorage. Click the connection pill in the topbar to change it.
 
-Stretch mode: **BalanceGuessr** — GeoGuessr with satellite imagery, 5-round game across Ontario, persistent best score.
+The map renderer happens to be Leaflet, but that's an implementation
+detail — the gesture pipeline and source abstraction don't depend on it.
 
 ## Gesture map
 

@@ -1,9 +1,9 @@
 {
-  "name": "balance-board-leaflet-web",
+  "name": "tilted-web",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Leaflet frontend for the Wii Balance Board bridge",
+  "description": "Tilted — pan and zoom a map by leaning on a Wii Balance Board",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
