@@ -307,55 +307,47 @@ export class WebHIDSource extends BaseSampleSource {
    * auto-detect whether button bytes are present by probing both offsets.
    */
   private handleReadResponse(data: DataView): void {
-    if (data.byteLength < 4) return;
+    // Layout per wiibrew spec: [btn0, btn1, error_size, addr_hi, addr_lo, data...]
+    // button bytes are always present (active-low, 0xFF when nothing pressed).
+    const BASE = 2;
+    if (data.byteLength < BASE + 3) return;
 
-    // Determine byte offset: spec says [btn0, btn1, error_size, addr_hi, addr_lo, ...].
-    // If the high nibble at offset 2 is non-zero, try offset 0 as a fallback
-    // (some firmware/OS combinations omit the 2 button bytes).
-    let base = 2; // standard: skip 2 button bytes
-    if (data.byteLength >= 3) {
-      const nibbleAt2 = (data.getUint8(2) >> 4) & 0x0f;
-      const nibbleAt0 = (data.getUint8(0) >> 4) & 0x0f;
-      if (nibbleAt2 !== 0 && nibbleAt0 === 0) {
-        console.warn(`[WBB] 0x21 error nibble at offset 2 = 0x${nibbleAt2.toString(16)}; retrying at offset 0 (nibble=0x${nibbleAt0.toString(16)})`);
-        base = 0;
-      }
-    }
-
-    if (data.byteLength < base + 3) return;
-    const errorSize = data.getUint8(base);
+    const errorSize = data.getUint8(BASE);
     const error = (errorSize >> 4) & 0x0f;
+
     if (error !== 0) {
-      // Error 0x7 = "address not found" — extension not initialized.
-      // Try old-style init (single 0x00 write to 0xa40040) as fallback.
-      if ((error === 0x7 || error === 0xf) && !this.tryOldInit) {
-        console.warn(`[WBB] error 0x${error.toString(16)} (address not found); retrying with old-style init`);
+      // Error 0x7 = address not found, 0xf = unknown — both mean the extension
+      // registers aren't accessible, so the new-style init (0x55/0x00) didn't
+      // take. Retry once with old-style init (0x00 to 0xa40040).
+      if (!this.tryOldInit) {
+        console.warn(`[WBB] calibration error 0x${error.toString(16)} — new-style init failed; trying old-style init`);
         this.tryOldInit = true;
-        this.calibrationBuffer = new Uint8Array(24);
-        // Retry: old-style init, then read again.
+        this.calibrationBuffer = new Uint8Array(CALIBRATION_LENGTH);
         void this.retryWithOldInit();
         return;
       }
       const allBytes = Array.from({ length: data.byteLength }, (_, i) =>
         data.getUint8(i).toString(16).padStart(2, "0")
       ).join(" ");
-      const msg = `Read error 0x${error.toString(16)} (base=${base}, byte[${base}]=0x${errorSize.toString(16)}). `
-        + `Open DevTools console (F12) for full log. Raw: ${allBytes}`;
-      console.error(`[WBB] calibration read failed: ${msg}`);
-      this.failCalibration(msg);
+      console.error(`[WBB] calibration failed after old-style retry: error=0x${error.toString(16)} raw: ${allBytes}`);
+      this.failCalibration(
+        `Calibration read failed (error=0x${error.toString(16)}) even after old-style init. `
+        + `Raw bytes: ${allBytes}`
+      );
       return;
     }
+
     const payloadLen = (errorSize & 0x0f) + 1;
-    const addrLow = data.getUint16(base + 1);
-    // Locate this chunk inside our 24-byte calibration buffer.
+    const addrLow = data.getUint16(BASE + 1);
     const offset = addrLow - (CALIBRATION_ADDR & 0xffff);
     if (offset < 0 || offset + payloadLen > CALIBRATION_LENGTH) {
-      console.warn(`[WBB] 0x21 chunk out of range: addrLow=0x${addrLow.toString(16)} offset=${offset} len=${payloadLen}`);
+      console.warn(`[WBB] 0x21 chunk ignored: addrLow=0x${addrLow.toString(16)} offset=${offset} payloadLen=${payloadLen}`);
       return;
     }
     for (let i = 0; i < payloadLen; i++) {
-      this.calibrationBuffer[offset + i] = data.getUint8(base + 3 + i);
+      this.calibrationBuffer[offset + i] = data.getUint8(BASE + 3 + i);
     }
+    console.log(`[WBB] calibration chunk ok: offset=${offset} len=${payloadLen} (${offset + payloadLen}/${CALIBRATION_LENGTH} bytes)`);
     if (offset + payloadLen >= CALIBRATION_LENGTH) {
       this.completeCalibration();
     }
