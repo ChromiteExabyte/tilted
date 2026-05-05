@@ -8,6 +8,9 @@ export const ROUNDS_PER_GAME = 5;
 /** Maximum score a single round can yield (perfect guess). */
 export const PERFECT_SCORE = 5000;
 
+/** Theoretical ceiling for a complete game — used to sanity-check stored bests. */
+export const MAX_POSSIBLE_SCORE = PERFECT_SCORE * ROUNDS_PER_GAME;
+
 /** Characteristic distance for the score's exponential decay (km). */
 export const SCORE_DECAY_KM = 250;
 
@@ -60,7 +63,9 @@ export function loadBestScore(): number {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw === null) return 0;
     const n = parseInt(raw, 10);
-    return Number.isFinite(n) && n >= 0 ? n : 0;
+    // Reject NaN, negative values, and impossible scores from a corrupted/edited store.
+    if (!Number.isFinite(n) || n < 0 || n > MAX_POSSIBLE_SCORE) return 0;
+    return n;
   } catch {
     return 0;
   }
@@ -68,7 +73,9 @@ export function loadBestScore(): number {
 
 export function saveBestScore(score: number): void {
   try {
-    localStorage.setItem(STORAGE_KEY, String(score));
+    // Mirror the load-side guard so a bug elsewhere can't poison storage.
+    const clean = Math.max(0, Math.min(MAX_POSSIBLE_SCORE, Math.round(score)));
+    localStorage.setItem(STORAGE_KEY, String(clean));
   } catch {
     // localStorage may be disabled (private mode, quota, etc.). Best-effort.
   }

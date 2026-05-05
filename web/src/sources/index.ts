@@ -13,3 +13,4 @@ export {
   type SourceAvailability,
 } from "./factory";
 export { pickAndStartSource, showPicker } from "./picker";
+export { bindConnButton } from "./wiring";

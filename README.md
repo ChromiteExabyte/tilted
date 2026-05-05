@@ -20,6 +20,7 @@ Stretch mode: **BalanceGuessr** — GeoGuessr with satellite imagery, 5-round ga
 | Zoom out        | Lift right leg                                    |
 | Zoom speed      | Bob up and down while leg is raised               |
 | Drop guess pin  | Both heels off, toes-only press (BalanceGuessr)   |
+| Cancel guess    | Press <kbd>Esc</kbd> to return to STUDY mid-round |
 | Re-zero session | Press <kbd>R</kbd> on the keyboard                |
 | Pause           | Step off                                          |
 
@@ -123,9 +124,9 @@ re-zero) works without the board.
 ## Tests
 
 ```
-make test            # bridge (pytest) + web (vitest), 74 tests total
+make test            # bridge (pytest) + web (vitest), 95 tests total
 make test-bridge     # Python sensor math (22 tests)
-make test-web        # gesture interpreter, scoring, simulator (52 tests)
+make test-web        # gestures, scoring, simulator, websocket source, conn-pill wiring (73 tests)
 make typecheck       # tsc --noEmit
 ```
 
@@ -160,8 +161,10 @@ web/
     locations.json     35 Ontario targets
   tests/             Vitest suites
     gestures.test.ts   Mode/command/pin/re-zero — 24 tests
-    scoring.test.ts    Haversine + score + shuffle — 17 tests
+    scoring.test.ts    Haversine + score + shuffle + best-score persistence — 26 tests
     simulator.test.ts  Sample shape + scenario integration — 11 tests
+    websocket.test.ts  Bridge source: connect, JSON parse, reconnect backoff, stop — 8 tests
+    wiring.test.ts     Conn-pill button binding — 4 tests
   index.html         Vite entry — atlas
   guesser.html       Vite entry — BalanceGuessr
   vite.config.ts     Multi-page build + vitest config

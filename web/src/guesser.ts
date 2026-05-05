@@ -14,7 +14,7 @@ import {
   pickAndStartSource,
   showPicker,
   isSampleEvent,
-  isStatusEvent,
+  bindConnButton,
   clearPreferredSource,
   type SampleSource,
 } from "./sources";
@@ -44,6 +44,8 @@ const STUDY_INITIAL_ZOOM = 14;
 const GUESS_INITIAL_ZOOM = 5;
 const GUESS_CENTER: L.LatLngTuple = [49.5, -82.0]; // roughly the geometric centre of Ontario
 const TARGET_JITTER_DEG = 0.05;
+/** Cap per-frame dt at 100 ms — see map.ts for rationale (tab-resume jumps). */
+const MAX_DT_S = 0.1;
 
 type GameState = "STUDY" | "GUESS" | "REVEAL" | "SUMMARY";
 
@@ -129,29 +131,16 @@ ui.best.textContent = `${bestScore} pts`;
 
 const gestures = new GestureInterpreter();
 let currentSource: SampleSource | null = null;
+let unbindConn: (() => void) | null = null;
 
 function attachSource(source: SampleSource): void {
   currentSource = source;
-  ui.conn.textContent = `● ${source.displayName}`;
-  ui.conn.classList.add("ok");
+  unbindConn?.();
+  unbindConn = bindConnButton(source, ui.conn);
 
   source.addEventListener("sample", (evt) => {
     if (!isSampleEvent(evt)) return;
     gestures.onSample(evt.detail);
-  });
-  source.addEventListener("statuschange", (evt) => {
-    if (!isStatusEvent(evt)) return;
-    const { status } = evt.detail;
-    if (status === "connected") {
-      ui.conn.textContent = `● ${source.displayName}`;
-      ui.conn.classList.add("ok");
-    } else if (status === "connecting") {
-      ui.conn.textContent = `○ ${source.displayName}`;
-      ui.conn.classList.remove("ok");
-    } else if (status === "disconnected") {
-      ui.conn.textContent = `○ reconnecting`;
-      ui.conn.classList.remove("ok");
-    }
   });
 }
 
@@ -182,9 +171,9 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 
 let lastT = performance.now();
 const tick = (now: number): void => {
-  const dt = (now - lastT) / 1000;
+  const dt = Math.min(MAX_DT_S, (now - lastT) / 1000);
   lastT = now;
-  if (state === "STUDY" || state === "GUESS") {
+  if ((state === "STUDY" || state === "GUESS") && gestures.status === "READY") {
     const cmd = gestures.command;
     const m = state === "STUDY" ? studyMap : guessMap;
     if (cmd.panX || cmd.panY) {
@@ -243,8 +232,9 @@ function switchTo(next: GameState): void {
   ui.studyPanel.classList.toggle("active", next === "STUDY");
   ui.guessPanel.classList.toggle("active", next === "GUESS");
   if (next === "GUESS") {
-    const c = guessMap.getCenter();
-    guessMarker = L.marker(c, { interactive: false }).addTo(guessMap);
+    // Replace any prior marker (Escape→STUDY→GUESS would otherwise stack them).
+    if (guessMarker) guessMap.removeLayer(guessMarker);
+    guessMarker = L.marker(guessMap.getCenter(), { interactive: false }).addTo(guessMap);
     guessMap.on("move", updateGuessMarker);
   } else {
     guessMap.off("move", updateGuessMarker);
@@ -354,6 +344,8 @@ function advance(): void {
 document.addEventListener("keydown", (e) => {
   if (e.key === "g" || e.key === "G") { advance(); return; }
   if (e.key === "r" || e.key === "R") { gestures.resetRezero(); return; }
+  // Escape during GUESS rewinds to STUDY (re-look at the imagery before committing).
+  if (e.key === "Escape" && state === "GUESS") { switchTo("STUDY"); return; }
   if (state === "REVEAL" || state === "SUMMARY") return;
   const m = state === "STUDY" ? studyMap : guessMap;
   const step = 60;

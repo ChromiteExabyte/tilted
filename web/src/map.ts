@@ -4,10 +4,10 @@ import {
   pickAndStartSource,
   showPicker,
   isSampleEvent,
-  isStatusEvent,
+  bindConnButton,
+  clearPreferredSource,
   type SampleSource,
 } from "./sources";
-import { clearPreferredSource } from "./sources";
 import type { GestureStatus, ModeChangeDetail, StatusChangeDetail } from "./types";
 import "./style.css";
 
@@ -15,6 +15,8 @@ const DEFAULT_CENTER: L.LatLngTuple = [49.0639, -81.0167]; // Cochrane, ON
 const DEFAULT_ZOOM = 6;
 const ZOOM_MIN = 2;
 const ZOOM_MAX = 19;
+/** Cap per-frame dt at 100 ms so a backgrounded tab doesn't punt the map across the world on resume. */
+const MAX_DT_S = 0.1;
 
 const map = L.map("map", {
   center: DEFAULT_CENTER,
@@ -73,11 +75,12 @@ const setPhase = (status: GestureStatus): void => {
 
 const gestures = new GestureInterpreter();
 let currentSource: SampleSource | null = null;
+let unbindConn: (() => void) | null = null;
 
 function attachSource(source: SampleSource): void {
   currentSource = source;
-  connEl.textContent = `● ${source.displayName}`;
-  connEl.classList.add("ok");
+  unbindConn?.();
+  unbindConn = bindConnButton(source, connEl);
 
   source.addEventListener("sample", (evt) => {
     if (!isSampleEvent(evt)) return;
@@ -91,21 +94,6 @@ function attachSource(source: SampleSource): void {
     copDot.style.left = `${((cx + 1) / 2) * 100}%`;
     copDot.style.top = `${((1 - cy) / 2) * 100}%`;
     copDot.classList.toggle("active", sample.present);
-  });
-
-  source.addEventListener("statuschange", (evt) => {
-    if (!isStatusEvent(evt)) return;
-    const { status } = evt.detail;
-    if (status === "connected") {
-      connEl.textContent = `● ${source.displayName}`;
-      connEl.classList.add("ok");
-    } else if (status === "connecting") {
-      connEl.textContent = `○ ${source.displayName}`;
-      connEl.classList.remove("ok");
-    } else if (status === "disconnected") {
-      connEl.textContent = `○ reconnecting`;
-      connEl.classList.remove("ok");
-    }
   });
 }
 
@@ -135,8 +123,12 @@ const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v
 
 let lastT = performance.now();
 const tick = (now: number): void => {
-  const dt = (now - lastT) / 1000;
+  const dt = Math.min(MAX_DT_S, (now - lastT) / 1000);
   lastT = now;
+  if (gestures.status !== "READY") {
+    requestAnimationFrame(tick);
+    return;
+  }
   const cmd = gestures.command;
   if (cmd.panX || cmd.panY) {
     map.panBy([cmd.panX * dt, cmd.panY * dt], { animate: false });

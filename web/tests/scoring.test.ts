@@ -1,10 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  MAX_POSSIBLE_SCORE,
   PERFECT_SCORE,
   ROUNDS_PER_GAME,
   SCORE_DECAY_KM,
   formatDistance,
   haversineKm,
+  loadBestScore,
+  saveBestScore,
   scoreFor,
   shuffle,
 } from "../src/scoring";
@@ -117,6 +120,82 @@ describe("shuffle", () => {
 describe("constants", () => {
   it("ROUNDS_PER_GAME is positive", () => {
     expect(ROUNDS_PER_GAME).toBeGreaterThan(0);
+  });
+
+  it("MAX_POSSIBLE_SCORE matches PERFECT_SCORE × ROUNDS_PER_GAME", () => {
+    expect(MAX_POSSIBLE_SCORE).toBe(PERFECT_SCORE * ROUNDS_PER_GAME);
+  });
+});
+
+// localStorage isn't present in the node test env; install a minimal in-memory
+// stand-in so loadBestScore / saveBestScore can be exercised end-to-end.
+class MemoryStorage implements Storage {
+  private store = new Map<string, string>();
+  get length(): number { return this.store.size; }
+  clear(): void { this.store.clear(); }
+  getItem(key: string): string | null { return this.store.get(key) ?? null; }
+  setItem(key: string, value: string): void { this.store.set(key, String(value)); }
+  removeItem(key: string): void { this.store.delete(key); }
+  key(i: number): string | null { return [...this.store.keys()][i] ?? null; }
+}
+
+describe("loadBestScore / saveBestScore", () => {
+  let storage: MemoryStorage;
+  beforeEach(() => {
+    storage = new MemoryStorage();
+    vi.stubGlobal("localStorage", storage);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("returns 0 when nothing stored", () => {
+    expect(loadBestScore()).toBe(0);
+  });
+
+  it("round-trips a legitimate score", () => {
+    saveBestScore(12_345);
+    expect(loadBestScore()).toBe(12_345);
+  });
+
+  it("rejects negative stored values", () => {
+    storage.setItem("balanceguessr.bestScore", "-50");
+    expect(loadBestScore()).toBe(0);
+  });
+
+  it("rejects values above the theoretical max (corrupted/tampered store)", () => {
+    storage.setItem("balanceguessr.bestScore", String(MAX_POSSIBLE_SCORE + 1));
+    expect(loadBestScore()).toBe(0);
+  });
+
+  it("rejects garbage", () => {
+    storage.setItem("balanceguessr.bestScore", "lol");
+    expect(loadBestScore()).toBe(0);
+  });
+
+  it("clamps oversized writes to MAX_POSSIBLE_SCORE on save", () => {
+    saveBestScore(MAX_POSSIBLE_SCORE * 100);
+    expect(loadBestScore()).toBe(MAX_POSSIBLE_SCORE);
+  });
+
+  it("rounds non-integer writes", () => {
+    saveBestScore(123.7);
+    expect(loadBestScore()).toBe(124);
+  });
+
+  it("survives localStorage throwing on access", () => {
+    const broken = {
+      length: 0,
+      clear: () => undefined,
+      key: () => null,
+      removeItem: () => undefined,
+      getItem: () => { throw new Error("private mode"); },
+      setItem: () => { throw new Error("private mode"); },
+    };
+    vi.stubGlobal("localStorage", broken);
+    expect(loadBestScore()).toBe(0);
+    // Best-effort save shouldn't throw either.
+    expect(() => saveBestScore(1000)).not.toThrow();
   });
 });
 
