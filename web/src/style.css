@@ -435,6 +435,7 @@ body::after {
 
 .panel {
   position: relative;
+  overflow: hidden;
   border-radius: 16px;
   border: 1px solid var(--glass-border);
   overflow: hidden;

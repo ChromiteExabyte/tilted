@@ -133,15 +133,15 @@ describe("integration with GestureInterpreter", () => {
     }
   });
 
-  it("demo scenario triggers at least one pin gesture", () => {
+  it("demo scenario triggers at least one footoff event (step-off commit gesture)", () => {
     const sim = new SimulatorSource({ scenario: demoScenario(), loop: false });
     const g = new GestureInterpreter();
-    let pins = 0;
-    g.addEventListener("guesspin", () => pins++);
+    let footoffs = 0;
+    g.addEventListener("footoff", () => footoffs++);
     for (let t = 0; t <= 25_000; t += 33) {
       g.onSample(sim.produce(t));
     }
-    expect(pins).toBeGreaterThanOrEqual(1);
+    expect(footoffs).toBeGreaterThanOrEqual(1);
   });
 
   it("quiet scenario completes the rezero phase without fluctuation", () => {

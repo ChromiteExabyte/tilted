@@ -22,10 +22,19 @@ weight stays local.
 
 ## Per-session re-zero
 
-Body asymmetry varies day to day. The frontend doesn't currently re-zero on
-session start, but the architecture supports it: when you click into the
-map page, capture COP for the first 2 seconds and subtract that as a
-session offset. (`TODO` in `map.js` — file an issue if you want this.)
+Body asymmetry varies day to day. The first ~2 seconds of presence on the
+board after page load (or after pressing **R**) are automatically averaged
+into a per-session COP offset that compensates for your resting lean. This
+correction is applied to every subsequent `cop_x / cop_y` reading before
+gesture classification.
+
+Status flow: `DISCONNECTED → REZEROING → READY`. The topbar shows the
+current phase. The map ignores all commands while `REZEROING` is active so
+a partially-settled offset doesn't steer the map during calibration.
+
+The offset is discarded when you press **R** or reload the page. It is
+_not_ saved to disk — it is cheap to re-capture and varies with footwear
+and fatigue.
 
 ## Foot placement
 

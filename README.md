@@ -1,5 +1,12 @@
 # Tilted
 
+> **Portfolio highlight** — a full-stack human-computer interaction project
+> that turns a 2007 Wii peripheral into a precision map-navigation input
+> device, with a GeoGuessr clone built on top. Demonstrates: WebHID device
+> driver (TypeScript), real-time gesture classification, per-session sensor
+> calibration, and a split-panel web game — all covered by a 95-test suite.
+> Live demo requires no hardware (select **Demo** in the connection modal).
+
 Pan and zoom a map by standing on a Wii Balance Board. Lean to steer,
 lift a leg to zoom, bob to control speed. Includes **BalanceGuessr** —
 a body-controlled GeoGuessr clone over Ontario satellite imagery.
@@ -17,16 +24,17 @@ detail — the gesture pipeline and source abstraction don't depend on it.
 
 ## Gesture map
 
-| Action          | Gesture                                           |
-| --------------- | ------------------------------------------------- |
-| Pan             | Tilt body — center of pressure controls direction |
-| Zoom in         | Lift left leg                                     |
-| Zoom out        | Lift right leg                                    |
-| Zoom speed      | Bob up and down while leg is raised               |
-| Drop guess pin  | Both heels off, toes-only press (BalanceGuessr)   |
-| Cancel guess    | Press <kbd>Esc</kbd> to return to STUDY mid-round |
-| Re-zero session | Press <kbd>R</kbd> on the keyboard                |
-| Pause           | Step off                                          |
+| Action                  | Gesture                                           |
+| ----------------------- | ------------------------------------------------- |
+| Pan                     | Tilt body — center of pressure controls direction |
+| Zoom in                 | Lift left leg                                     |
+| Zoom out                | Lift right leg                                    |
+| Zoom speed              | Bob up and down while leg is raised               |
+| Advance (BalanceGuessr) | **Step off** — exits STUDY → GUESS, or commits GUESS → REVEAL |
+| Acknowledge result      | **Step back on** — advances REVEAL → next round / SUMMARY → new game |
+| Cancel guess            | Press <kbd>Esc</kbd> to return to STUDY mid-round |
+| Re-zero session         | Press <kbd>R</kbd> on the keyboard                |
+| Pause (Atlas)           | Step off                                          |
 
 Mode discrimination is automatic: the bridge looks at how weight is distributed
 across the four sensors and decides whether you're tilting (both feet down) or

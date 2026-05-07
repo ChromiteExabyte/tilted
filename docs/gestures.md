@@ -82,15 +82,21 @@ leg is raised, you'd overshoot constantly. Bobbing is a deliberate effort —
 standing still on one leg is the "slow zoom" gesture, bobbing is "fast
 zoom."
 
-## Pin gesture (BalanceGuessr)
+## Commit gesture (BalanceGuessr)
 
-Toes-only press, held for 600 ms:
+Simply **step off the board** — `present` transitions from `true` to
+`false`, firing the `footoff` event in `GestureInterpreter`. The game
+consumes this event to advance the state machine:
 
-```
-heels = BL + BR
-toes  = TL + TR
-held  = (heels < 1 kg) AND (toes > 6 kg) for ≥ 600 ms
-```
+| Phase    | step-off action                |
+| -------- | ------------------------------ |
+| `STUDY`  | enter `GUESS` (navigate the overview map) |
+| `GUESS`  | commit guess → `REVEAL`        |
 
-Tunables live in `web/js/gestures.js` under `DEFAULTS`. All thresholds are
-in kg, fractions, or milliseconds — no magic numbers in raw evdev units.
+Stepping **back on** advances `REVEAL → next STUDY` and `SUMMARY → new game`,
+so the interaction loop is: stand → look → step off → navigate → step off
+→ read results → step back on → repeat.
+
+Tunables (deadzone, bob window, zoom rates, etc.) live in
+`web/src/gestures.ts` under `DEFAULTS`. All thresholds are in kg,
+fractions, or milliseconds — no magic numbers in raw evdev units.

@@ -46,6 +46,11 @@ const GUESS_CENTER: L.LatLngTuple = [49.5, -82.0]; // roughly the geometric cent
 const TARGET_JITTER_DEG = 0.05;
 /** Cap per-frame dt at 100 ms — see map.ts for rationale (tab-resume jumps). */
 const MAX_DT_S = 0.1;
+/**
+ * CSS scale applied to the study map so that rotated corners don't show
+ * blank tile areas. √2 ≈ 1.414 is the worst case; 1.5 gives a small margin.
+ */
+const STUDY_SCALE = 1.5;
 
 type GameState = "STUDY" | "GUESS" | "REVEAL" | "SUMMARY";
 
@@ -124,6 +129,8 @@ let bestScore = loadBestScore();
 let pool: Location[] = [];
 let target: Location | null = null;
 let results: RoundResult[] = [];
+/** Current clockwise rotation (degrees) applied to the study map. */
+let studyRotation = 0;
 
 ui.best.textContent = `${bestScore} pts`;
 
@@ -154,7 +161,14 @@ ui.conn.addEventListener("click", async () => {
 
 void pickAndStartSource(ui.pickerRoot).then(attachSource);
 
-gestures.addEventListener("guesspin", () => advance());
+// Step off the board → advance from STUDY or GUESS phases.
+gestures.addEventListener("footoff", () => {
+  if (state === "STUDY" || state === "GUESS") advance();
+});
+// Step back on the board → acknowledge result and continue.
+gestures.addEventListener("footon", () => {
+  if (state === "REVEAL" || state === "SUMMARY") advance();
+});
 gestures.addEventListener("modechange", (evt) => {
   if (state === "REVEAL" || state === "SUMMARY") return;
   if (gestures.status === "REZEROING") return;
@@ -177,7 +191,18 @@ const tick = (now: number): void => {
     const cmd = gestures.command;
     const m = state === "STUDY" ? studyMap : guessMap;
     if (cmd.panX || cmd.panY) {
-      m.panBy([cmd.panX * dt, cmd.panY * dt], { animate: false });
+      if (state === "STUDY" && studyRotation !== 0) {
+        // Rotate body-tilt vectors so "lean forward" = visual up, regardless of
+        // how much the study map is CSS-rotated this round.
+        const θ = (studyRotation * Math.PI) / 180;
+        const c = Math.cos(θ);
+        const s = Math.sin(θ);
+        const lx = cmd.panX * c - cmd.panY * s;
+        const ly = cmd.panX * s + cmd.panY * c;
+        m.panBy([lx * dt, ly * dt], { animate: false });
+      } else {
+        m.panBy([cmd.panX * dt, cmd.panY * dt], { animate: false });
+      }
     }
     if (cmd.zoom) {
       const min = state === "STUDY" ? STUDY_ZOOM_MIN : 3;
@@ -211,6 +236,11 @@ function startRound(): void {
   target = pool.pop()!;
   ui.round.textContent = `round ${round} of ${ROUNDS_PER_GAME}`;
   clearRoundLayers();
+
+  // Random bearing each round — satellite is never north-up.
+  studyRotation = Math.random() * 360;
+  studyMap.getContainer().style.transform =
+    `rotate(${studyRotation}deg) scale(${STUDY_SCALE})`;
 
   const lat = target.lat + (Math.random() - 0.5) * TARGET_JITTER_DEG;
   const lon = target.lon + (Math.random() - 0.5) * TARGET_JITTER_DEG;

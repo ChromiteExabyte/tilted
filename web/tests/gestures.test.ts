@@ -208,53 +208,6 @@ describe("command — zoom + bob", () => {
   });
 });
 
-describe("pin gesture", () => {
-  it("fires guesspin after toes-only press is held", () => {
-    const g = new GestureInterpreter({ pinHoldMs: 500 });
-    const t = calibrate(g);
-    let pins = 0;
-    g.addEventListener("guesspin", () => pins++);
-    // Toes-only: heels < 1 kg, toes > 6 kg, sustained
-    for (let i = 0; i <= 600; i += 33) {
-      g.onSample(
-        sample({ TL: 20, TR: 20, BL: 0.2, BR: 0.2 }, (t + i) / 1000),
-      );
-    }
-    expect(pins).toBe(1);
-  });
-
-  it("does not fire if hold is too short", () => {
-    const g = new GestureInterpreter({ pinHoldMs: 500 });
-    const t = calibrate(g);
-    let pins = 0;
-    g.addEventListener("guesspin", () => pins++);
-    for (let i = 0; i <= 200; i += 33) {
-      g.onSample(
-        sample({ TL: 20, TR: 20, BL: 0.2, BR: 0.2 }, (t + i) / 1000),
-      );
-    }
-    expect(pins).toBe(0);
-  });
-
-  it("resets if heels touch down mid-hold", () => {
-    const g = new GestureInterpreter({ pinHoldMs: 500 });
-    const t = calibrate(g);
-    let pins = 0;
-    g.addEventListener("guesspin", () => pins++);
-    // Start hold
-    for (let i = 0; i <= 300; i += 33) {
-      g.onSample(sample({ TL: 20, TR: 20, BL: 0.2, BR: 0.2 }, (t + i) / 1000));
-    }
-    // Heels touch down — break the gesture
-    g.onSample(sample({ TL: 20, TR: 20, BL: 5, BR: 5 }, (t + 333) / 1000));
-    // Resume toes-only, but for less than full hold
-    for (let i = 366; i <= 500; i += 33) {
-      g.onSample(sample({ TL: 20, TR: 20, BL: 0.2, BR: 0.2 }, (t + i) / 1000));
-    }
-    expect(pins).toBe(0);
-  });
-});
-
 describe("session re-zero", () => {
   it("starts in DISCONNECTED, transitions to REZEROING on presence, then READY", () => {
     const g = new GestureInterpreter({ rezeroDurationMs: 1000 });

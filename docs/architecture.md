@@ -69,9 +69,23 @@ Each WebSocket frame is one JSON object:
 | `left_share`  | float   | (TL+BL)/total                                        |
 | `right_share` | float   | (TR+BR)/total                                        |
 
+## Connection paths
+
+Three ways a browser tab gets sensor data, all behind the same
+`SampleSource` interface (`web/src/sources/types.ts`):
+
+| Mode         | Class          | Transport                      |
+| ------------ | -------------- | ------------------------------ |
+| Demo         | `SimulatorSource` | synthetic samples in-process |
+| WebHID       | `WebHIDSource`    | USB/BT HID directly in Chrome/Edge |
+| Bridge       | `WebSocketSource` | JSON frames from `balance_bridge.py` |
+
+Gesture interpretation, re-zero logic, and command synthesis all live in
+`web/src/gestures.ts` — none of the sources know about gestures.
+
 ## Extending
 
-- **Replace Leaflet with MapLibre.** Swap `web/index.html` and `web/js/map.js`.
+- **Replace Leaflet with MapLibre.** Swap `web/index.html` and `web/src/map.ts`.
   The bridge and gesture interpreter don't change.
 - **Add Wii Remote support.** Wrap `find_balance_board()` in a more general
   device picker; the rest of the bridge already speaks evdev.

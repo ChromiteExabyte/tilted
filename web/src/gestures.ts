@@ -16,9 +16,6 @@ export interface GestureOptions {
   panGainPxPerSec?: number;
   zoomBaseRatePerSec?: number;
   zoomBobMultiplier?: number;
-  pinHeelMaxKg?: number;
-  pinToeMinKg?: number;
-  pinHoldMs?: number;
   rezeroDurationMs?: number;
 }
 
@@ -31,9 +28,6 @@ const DEFAULTS: Required<GestureOptions> = {
   panGainPxPerSec: 800,
   zoomBaseRatePerSec: 0.6,
   zoomBobMultiplier: 3.0,
-  pinHeelMaxKg: 1.0,
-  pinToeMinKg: 6.0,
-  pinHoldMs: 600,
   rezeroDurationMs: 2000,
 };
 
@@ -61,7 +55,6 @@ export class GestureInterpreter extends EventTarget {
   lastSample: BoardSample | null = null;
 
   private bobHistory: BobFrame[] = [];
-  private pinHoldStart: number | null = null;
 
   private rezeroAccumX = 0;
   private rezeroAccumY = 0;
@@ -82,7 +75,6 @@ export class GestureInterpreter extends EventTarget {
     this.updateStatusAndRezero(sample, nowMs);
     this.updateBobHistory(sample, nowMs);
     this.updateMode(sample);
-    this.checkPinGesture(sample, nowMs);
     this.command = this.computeCommand(sample);
   }
 
@@ -203,33 +195,6 @@ export class GestureInterpreter extends EventTarget {
     if (amp <= bobMinAmpKg) return 1.0;
     const t = Math.min(1, (amp - bobMinAmpKg) / (bobMaxAmpKg - bobMinAmpKg));
     return 1.0 + t * (zoomBobMultiplier - 1.0);
-  }
-
-  // ---------------------------------------------------------------------------
-  // Pin gesture (toes-only press, held)
-  // ---------------------------------------------------------------------------
-
-  private checkPinGesture(sample: BoardSample, nowMs: number): void {
-    if (!sample.present) {
-      this.pinHoldStart = null;
-      return;
-    }
-    const heels = sample.BL + sample.BR;
-    const toes = sample.TL + sample.TR;
-    const { pinHeelMaxKg, pinToeMinKg, pinHoldMs } = this.options;
-    const holding = heels < pinHeelMaxKg && toes > pinToeMinKg;
-    if (!holding) {
-      this.pinHoldStart = null;
-      return;
-    }
-    if (this.pinHoldStart === null) {
-      this.pinHoldStart = nowMs;
-      return;
-    }
-    if (nowMs - this.pinHoldStart >= pinHoldMs) {
-      this.pinHoldStart = null;
-      this.dispatchEvent(new Event("guesspin"));
-    }
   }
 
   // ---------------------------------------------------------------------------
