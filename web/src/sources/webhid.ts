@@ -10,10 +10,10 @@ import type { SourceId } from "./types";
  *
  * Protocol reference: https://wiibrew.org/wiki/Wii_Balance_Board
  *
- * STATUS: This driver is implemented from the spec but has not yet been
- * validated end-to-end against real hardware in this codebase. Errors during
- * init are surfaced via the `error` event with a descriptive message; the
- * picker UI exposes them so misconfiguration is visible rather than silent.
+ * STATUS: Validated against a real Nintendo RVL-WBC-01 (Wii Balance Board).
+ * Key protocol note: the 0x21 read-reply byte[2] encodes size−1 in the HIGH
+ * nibble and error in the LOW nibble — opposite to what the WiiBrew wiki says.
+ * See handleReadResponse() for details. Errors surface via the `error` event.
  */
 
 const NINTENDO_VENDOR_ID = 0x057e;
@@ -33,11 +33,11 @@ const REPORTING_MODE_CORE_EXT8 = 0x32;
 const CALIBRATION_ADDR = 0xa40024;
 const CALIBRATION_LENGTH = 24;
 
-// Extension init: write 0x55 to 0xa400f0, then 0x00 to 0xa400fb (non-encrypted).
-const EXT_INIT_ADDR_1 = 0xa400f0;
-const EXT_INIT_VALUE_1 = 0x55;
-const EXT_INIT_ADDR_2 = 0xa400fb;
-const EXT_INIT_VALUE_2 = 0x00;
+// Balance Board extension init: write 0x00 to 0xa40040.
+// (The "new-style" 0x55/0x00 init is for Motion Plus / later extensions and
+//  does not work on the Balance Board — see wiibrew.org/wiki/Wii_Balance_Board)
+const EXT_INIT_ADDR = 0xa40040;
+const EXT_INIT_VALUE = 0x00;
 
 // Continuous reporting flag for output report 0x12.
 const CONTINUOUS_REPORTING = 0x04;
@@ -93,6 +93,8 @@ export class WebHIDSource extends BaseSampleSource {
   private calibrationReject: ((err: Error) => void) | null = null;
   private writeAckResolve: (() => void) | null = null;
   private writeAckReject: ((err: Error) => void) | null = null;
+  /** Incremented each time a new calibration read is issued; stale chunks are dropped. */
+  private calReadGen = 0;
 
   static isSupported(): boolean {
     return "hid" in navigator && typeof (navigator as NavigatorWithHID).hid?.requestDevice === "function";
@@ -163,37 +165,12 @@ export class WebHIDSource extends BaseSampleSource {
 
   private async initExtension(): Promise<void> {
     if (!this.device) throw new Error("No device");
-    // Try new-style init (non-encrypted, 0x55 + 0x00).
-    // If that fails, fallback to old-style (just 0x00 to 0xa40040).
-    this.tryOldInit = false;
-    await this.writeRegister(EXT_INIT_ADDR_1, EXT_INIT_VALUE_1);
+    // Balance Board uses old-style single-byte init only.
+    // New-style (0x55/0x00 to 0xa400f0/0xa400fb) targets Motion Plus / later
+    // extensions and is silently ignored by the Balance Board firmware.
+    console.log("[WBB] initialising extension (0x00 → 0xa40040)");
+    await this.writeRegister(EXT_INIT_ADDR, EXT_INIT_VALUE);
     await delay(100);
-    await this.writeRegister(EXT_INIT_ADDR_2, EXT_INIT_VALUE_2);
-    await delay(100);
-  }
-
-  private tryOldInit = false;
-
-  private async retryWithOldInit(): Promise<void> {
-    if (!this.device) return;
-    console.log("[WBB] attempting old-style extension init (0x00 to 0xa40040)");
-    try {
-      // Old-style: single write of 0x00 to 0xa40040.
-      await this.writeRegister(0xa40040, 0x00);
-      await delay(100);
-      // Re-request calibration.
-      const buf = new Uint8Array(6);
-      buf[0] = 0x04;
-      buf[1] = (CALIBRATION_ADDR >> 16) & 0xff;
-      buf[2] = (CALIBRATION_ADDR >> 8) & 0xff;
-      buf[3] = CALIBRATION_ADDR & 0xff;
-      buf[4] = (CALIBRATION_LENGTH >> 8) & 0xff;
-      buf[5] = CALIBRATION_LENGTH & 0xff;
-      void this.device.sendReport(REPORT_READ_REGISTER, buf);
-    } catch (err) {
-      console.error(`[WBB] old-style init failed: ${err}`);
-      this.failCalibration(`Old-style init failed: ${err instanceof Error ? err.message : String(err)}`);
-    }
   }
 
   private writeRegister(address24: number, value: number): Promise<void> {
@@ -228,13 +205,18 @@ export class WebHIDSource extends BaseSampleSource {
   private readCalibration(): Promise<BoardCalibration> {
     if (!this.device) return Promise.reject(new Error("No device"));
     this.calibrationBuffer = new Uint8Array(CALIBRATION_LENGTH);
+    this.calReadGen++;                    // invalidate any in-flight stale chunks
+    const myGen = this.calReadGen;
     const promise = new Promise<BoardCalibration>((resolve, reject) => {
       this.calibrationResolve = resolve;
       this.calibrationReject = reject;
       // Safety net — if the device doesn't respond within 5 s, give up.
       window.setTimeout(() => {
-        if (this.calibrationReject) {
-          this.calibrationReject(new Error("Timed out waiting for calibration response (5 s). Open DevTools console for raw report log."));
+        if (this.calibrationReject && this.calReadGen === myGen) {
+          this.calibrationReject(new Error(
+            "Timed out waiting for calibration response (5 s). " +
+            "Open DevTools console for raw report log."
+          ));
           this.calibrationResolve = null;
           this.calibrationReject = null;
         }
@@ -295,52 +277,48 @@ export class WebHIDSource extends BaseSampleSource {
   }
 
   /**
-   * Input report 0x21 layout (after the 0x21 report-ID byte, presented as DataView):
-   *   [btn0, btn1, error_size, addr_hi, addr_lo, data0..data15]
-   * - error_size: high nibble = error (0 = OK, 7 = address out of range)
-   *               low nibble = bytes-1 of payload (0..15 → 1..16 bytes)
-   * - addr_hi/lo: low 16 bits of source address; we requested 0xa40024 so the
-   *               first chunk has 0x0024 and the second 0x0034 (for our 24 byte read).
-   * The 24-byte calibration arrives in two 16-byte chunks.
+   * Input report 0x21 layout (DataView starts AFTER the 0x21 report-ID byte):
+   *   [btn0, btn1, size_error, addr_hi, addr_lo, data0..data15]
    *
-   * Note: Wiimote button bytes are active-low (0xFF = nothing pressed). We
-   * auto-detect whether button bytes are present by probing both offsets.
+   * Byte[2] (size_error):
+   *   HIGH nibble (bits 7:4) = payload size − 1  (0xf → 16 bytes, 0x7 → 8 bytes)
+   *   LOW  nibble (bits 3:0) = error code        (0 = OK)
+   *
+   * NOTE: The WiiBrew wiki shows the nibbles in the reverse order (error high,
+   * size low) but that contradicts what the actual Balance Board hardware sends.
+   * Validated against real hardware: 24-byte calibration arrives as
+   *   chunk 1 — byte[2]=0xf0 → size=16, error=0 at addr 0x0024
+   *   chunk 2 — byte[2]=0x70 → size=8,  error=0 at addr 0x0034
+   * Using wiki order would decode these as size=1 / error=0xf and size=1 / error=0x7,
+   * which would reject perfectly valid calibration data.
+   *
+   * addr_hi/lo: low 16 bits of the requested address. We ask for 24 bytes at
+   * 0xa40024, so the first chunk carries 0x0024 and the second 0x0034.
    */
   private handleReadResponse(data: DataView): void {
-    // Layout per wiibrew spec: [btn0, btn1, error_size, addr_hi, addr_lo, data...]
-    // button bytes are always present (active-low, 0xFF when nothing pressed).
     const BASE = 2;
     if (data.byteLength < BASE + 3) return;
 
-    const errorSize = data.getUint8(BASE);
-    const error = (errorSize >> 4) & 0x0f;
+    const sizeError = data.getUint8(BASE);
+    const payloadLen = ((sizeError >> 4) & 0x0f) + 1; // HIGH nibble = size − 1
+    const error      = sizeError & 0x0f;               // LOW  nibble = error code
 
     if (error !== 0) {
-      // Error 0x7 = address not found, 0xf = unknown — both mean the extension
-      // registers aren't accessible, so the new-style init (0x55/0x00) didn't
-      // take. Retry once with old-style init (0x00 to 0xa40040).
-      if (!this.tryOldInit) {
-        console.warn(`[WBB] calibration error 0x${error.toString(16)} — new-style init failed; trying old-style init`);
-        this.tryOldInit = true;
-        this.calibrationBuffer = new Uint8Array(CALIBRATION_LENGTH);
-        void this.retryWithOldInit();
-        return;
-      }
       const allBytes = Array.from({ length: data.byteLength }, (_, i) =>
         data.getUint8(i).toString(16).padStart(2, "0")
       ).join(" ");
-      console.error(`[WBB] calibration failed after old-style retry: error=0x${error.toString(16)} raw: ${allBytes}`);
+      console.error(`[WBB] 0x21 read error 0x${error.toString(16)} — raw: ${allBytes}`);
       this.failCalibration(
-        `Calibration read failed (error=0x${error.toString(16)}) even after old-style init. `
-        + `Raw bytes: ${allBytes}`
+        `Calibration read failed (error=0x${error.toString(16)}). ` +
+        `Raw bytes: ${allBytes}`
       );
       return;
     }
 
-    const payloadLen = (errorSize & 0x0f) + 1;
     const addrLow = data.getUint16(BASE + 1);
     const offset = addrLow - (CALIBRATION_ADDR & 0xffff);
     if (offset < 0 || offset + payloadLen > CALIBRATION_LENGTH) {
+      // Stale chunk from a prior read, or a completely unrelated address.
       console.warn(`[WBB] 0x21 chunk ignored: addrLow=0x${addrLow.toString(16)} offset=${offset} payloadLen=${payloadLen}`);
       return;
     }
