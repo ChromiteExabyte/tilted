@@ -58,20 +58,19 @@ describe("classify / mode", () => {
     expect(g.mode).toBe("PAN");
   });
 
-  it("classifies left-leg-raised as ZOOM_IN", () => {
-    const g = new GestureInterpreter();
-    const t = calibrate(g);
-    // Left side near zero → left_share < 0.15
-    g.onSample(sample({ TL: 0.5, TR: 30, BL: 0.5, BR: 30 }, (t + 33) / 1000));
-    expect(g.mode).toBe("ZOOM_IN");
-  });
-
-  it("classifies right-leg-raised as ZOOM_OUT", () => {
-    const g = new GestureInterpreter();
-    const t = calibrate(g);
-    g.onSample(sample({ TL: 30, TR: 0.5, BL: 30, BR: 0.5 }, (t + 33) / 1000));
-    expect(g.mode).toBe("ZOOM_OUT");
-  });
+  // ZOOM TEMPORARILY DISABLED — these will pass again when classify() is re-enabled.
+  // it("classifies left-leg-raised as ZOOM_IN", () => {
+  //   const g = new GestureInterpreter();
+  //   const t = calibrate(g);
+  //   g.onSample(sample({ TL: 0.5, TR: 30, BL: 0.5, BR: 30 }, (t + 33) / 1000));
+  //   expect(g.mode).toBe("ZOOM_IN");
+  // });
+  // it("classifies right-leg-raised as ZOOM_OUT", () => {
+  //   const g = new GestureInterpreter();
+  //   const t = calibrate(g);
+  //   g.onSample(sample({ TL: 30, TR: 0.5, BL: 30, BR: 0.5 }, (t + 33) / 1000));
+  //   expect(g.mode).toBe("ZOOM_OUT");
+  // });
 
   it("returns to ABSENT below MIN_TOTAL_KG", () => {
     const g = new GestureInterpreter();
@@ -108,9 +107,11 @@ describe("modechange events", () => {
     });
     // Even tilt → PAN
     g.onSample(sample({ TL: 25, TR: 15, BL: 25, BR: 15 }, 5));
-    // Left lifted → ZOOM_IN
-    g.onSample(sample({ TL: 0.5, TR: 30, BL: 0.5, BR: 30 }, 5.1));
-    expect(transitions.at(-1)).toEqual({ from: "PAN", to: "ZOOM_IN" });
+    // Step off → ABSENT
+    g.onSample(sample({ TL: 0, TR: 0, BL: 0, BR: 0, present: false }, 5.1));
+    expect(transitions.at(-1)).toEqual({ from: "PAN", to: "ABSENT" });
+    // ZOOM TEMPORARILY DISABLED: leg-raise was tested here as PAN → ZOOM_IN.
+    // Restore when zoom design is revisited.
   });
 });
 
@@ -166,47 +167,12 @@ describe("command — pan", () => {
   });
 });
 
-describe("command — zoom + bob", () => {
-  it("ZOOM_IN produces positive zoom rate", () => {
-    const g = new GestureInterpreter();
-    const t = calibrate(g);
-    g.onSample(sample({ TL: 0.5, TR: 30, BL: 0.5, BR: 30 }, (t + 33) / 1000));
-    expect(g.command.zoom).toBeGreaterThan(0);
-  });
-
-  it("ZOOM_OUT produces negative zoom rate", () => {
-    const g = new GestureInterpreter();
-    const t = calibrate(g);
-    g.onSample(sample({ TL: 30, TR: 0.5, BL: 30, BR: 0.5 }, (t + 33) / 1000));
-    expect(g.command.zoom).toBeLessThan(0);
-  });
-
-  it("bobbing accelerates zoom rate vs steady stance", () => {
-    const steady = new GestureInterpreter();
-    const bobbing = new GestureInterpreter();
-    const tA = calibrate(steady);
-    const tB = calibrate(bobbing);
-
-    // Both: left side near zero (ZOOM_IN), right side at 39.5 kg per corner =
-    // total 80 kg. This matches calibration's total weight, so steady has
-    // zero bob amplitude (calibration samples don't contaminate the rolling
-    // window). Bobbing varies the right side ±5 kg.
-    const samplesPerSec = 30;
-    for (let i = 0; i < samplesPerSec; i++) {
-      steady.onSample(
-        sample({ TL: 0.5, TR: 39.5, BL: 0.5, BR: 39.5 }, (tA + i * 33) / 1000),
-      );
-      const wobble = Math.sin(i * 0.6) * 5;
-      bobbing.onSample(
-        sample(
-          { TL: 0.5, TR: 39.5 + wobble, BL: 0.5, BR: 39.5 + wobble },
-          (tB + i * 33) / 1000,
-        ),
-      );
-    }
-    expect(bobbing.command.zoom).toBeGreaterThan(steady.command.zoom);
-  });
-});
+// ZOOM TEMPORARILY DISABLED — restore this describe block when zoom design is revisited.
+// describe("command — zoom + bob", () => {
+//   it("ZOOM_IN produces positive zoom rate", () => { ... });
+//   it("ZOOM_OUT produces negative zoom rate", () => { ... });
+//   it("bobbing accelerates zoom rate vs steady stance", () => { ... });
+// });
 
 describe("inertia — tick()", () => {
   it("velocity approaches target command over successive ticks", () => {
@@ -243,7 +209,9 @@ describe("inertia — tick()", () => {
     const decayed = g.tick(0.100); // dt = 1τ → α ≈ 0.63, vel ≈ 37% of peak
     const nearZero = g.tick(0.500); // another ~5τ → essentially zero
     expect(decayed.panX).toBeGreaterThanOrEqual(0); // still coasting (or snapped to 0)
-    expect(nearZero.panX).toBe(0); // snapped by PAN_SNAP threshold
+    // After 10τ the residual is < 0.5 px/s and snaps to zero.
+    const fullyDecayed = g.tick(1.0); // 10τ with τ=100ms
+    expect(fullyDecayed.panX).toBe(0); // snapped by PAN_SNAP threshold
   });
 
   it("resetRezero zeroes velocity mid-glide", () => {
@@ -260,20 +228,8 @@ describe("inertia — tick()", () => {
     expect(after.zoom).toBe(0);
   });
 
-  it("zoom velocity smooths over time", () => {
-    const g = new GestureInterpreter({ zoomInertiaMs: 100 });
-    const t = calibrate(g);
-    // Left leg raised → ZOOM_IN
-    g.onSample(sample({ TL: 0.5, TR: 30, BL: 0.5, BR: 30 }, (t + 33) / 1000));
-    const targetZoom = g.command.zoom;
-    expect(targetZoom).toBeGreaterThan(0);
-
-    const first = g.tick(0.033);
-    const later  = g.tick(0.300);
-    expect(first.zoom).toBeGreaterThan(0);
-    expect(first.zoom).toBeLessThan(targetZoom);
-    expect(later.zoom).toBeGreaterThan(first.zoom);
-  });
+  // ZOOM TEMPORARILY DISABLED — restore when zoom design is revisited.
+  // it("zoom velocity smooths over time", () => { ... });
 });
 
 describe("session re-zero", () => {

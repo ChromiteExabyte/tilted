@@ -133,10 +133,11 @@ const tick = (now: number): void => {
   if (cmd.panX || cmd.panY) {
     map.panBy([cmd.panX * dt, cmd.panY * dt], { animate: false });
   }
-  if (cmd.zoom) {
-    const z = clamp(map.getZoom() + cmd.zoom * dt, ZOOM_MIN, ZOOM_MAX);
-    if (Math.abs(z - map.getZoom()) > 0.001) map.setZoom(z, { animate: false });
-  }
+  // ZOOM TEMPORARILY DISABLED — re-enable with revised zoom design.
+  // if (cmd.zoom) {
+  //   const z = clamp(map.getZoom() + cmd.zoom * dt, ZOOM_MIN, ZOOM_MAX);
+  //   if (Math.abs(z - map.getZoom()) > 0.001) map.setZoom(z, { animate: false });
+  // }
   requestAnimationFrame(tick);
 };
 requestAnimationFrame(tick);

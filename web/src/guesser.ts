@@ -204,12 +204,13 @@ const tick = (now: number): void => {
         m.panBy([cmd.panX * dt, cmd.panY * dt], { animate: false });
       }
     }
-    if (cmd.zoom) {
-      const min = state === "STUDY" ? STUDY_ZOOM_MIN : 3;
-      const max = state === "STUDY" ? STUDY_ZOOM_MAX : 18;
-      const z = clamp(m.getZoom() + cmd.zoom * dt, min, max);
-      if (Math.abs(z - m.getZoom()) > 0.001) m.setZoom(z, { animate: false });
-    }
+    // ZOOM TEMPORARILY DISABLED — re-enable with revised zoom design.
+    // if (cmd.zoom) {
+    //   const min = state === "STUDY" ? STUDY_ZOOM_MIN : 3;
+    //   const max = state === "STUDY" ? STUDY_ZOOM_MAX : 18;
+    //   const z = clamp(m.getZoom() + cmd.zoom * dt, min, max);
+    //   if (Math.abs(z - m.getZoom()) > 0.001) m.setZoom(z, { animate: false });
+    // }
   }
   requestAnimationFrame(tick);
 };
