@@ -194,7 +194,7 @@ Makefile             All commands (bridge + web)
 - [x] TypeScript with strict mode + Vitest unit tests
 - [x] Source abstraction: simulator / WebHID / bridge, picker UI, persisted choice
 - [ ] Console / terminal to get output data -- the Wii board is painful to connnect to bluetooth at present. 
-- [ ] WebHID validated against a real Balance Board (your job — protocol code is written)
+- [x] WebHID validated against a real Balance Board
 - [ ] Bridge tested on real hardware (your job — see `docs/calibration.md`)
 - [ ] Foot outline calibration mat
 
