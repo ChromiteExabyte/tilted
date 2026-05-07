@@ -81,11 +81,12 @@ pin gestures — so you can see the whole UI working without a board.
 2. `npm run dev`, open the page, pick **Wii Balance Board (WebHID)**.
 3. Browser shows a device picker → select "Nintendo RVL-WBC-01" → done.
 
-The WebHID driver lives in [`web/src/sources/webhid.ts`](web/src/sources/webhid.ts)
-and follows the protocol at [wiibrew.org](https://wiibrew.org/wiki/Wii_Balance_Board).
-This path has been validated against the spec but not yet against real hardware
-in this codebase — errors during init surface in the picker as a descriptive
-message instead of failing silently.
+The WebHID driver lives in [`web/src/sources/webhid.ts`](web/src/sources/webhid.ts).
+It has been validated against a real Nintendo RVL-WBC-01. One non-obvious
+finding: the `0x21` read-reply byte encodes `size−1` in the HIGH nibble and
+`error` in the LOW nibble — opposite to what the WiiBrew wiki documents. The
+correct Balance Board init is a single write of `0x00` to `0xa40040` (old-style);
+the Motion Plus "new-style" init does not apply.
 
 ## Original Linux/bridge path
 

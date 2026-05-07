@@ -43,7 +43,7 @@ Items marked ✅ are shipped. Items marked 🔲 are planned or in progress.
 
 ## Hardware
 
-- 🔲 Validate WebHID path against a real Balance Board end-to-end
+- ✅ Validate WebHID path against a real Balance Board end-to-end
 - 🔲 Foot-outline calibration mat template (PDF) for repeatable placement
 - 🔲 Axis-mapping auto-probe (surface `--probe` output in the picker)
 
