@@ -1,6 +1,6 @@
 # Tilted
 
-> **Portfolio highlight** — a full-stack human-computer interaction project
+> A full-stack project
 > that turns a 2007 Wii peripheral into a precision map-navigation input
 > device, with a GeoGuessr clone built on top. Demonstrates: WebHID device
 > driver (TypeScript), real-time gesture classification, per-session sensor
