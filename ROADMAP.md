@@ -16,6 +16,7 @@ Items marked ✅ are shipped. Items marked 🔲 are planned or in progress.
 
 - ✅ Leaflet map, pan / zoom from gestures
 - ✅ Quadratic pan response — fine near center, fast at edges
+- ✅ Pan + zoom inertia — exponential low-pass filter (`tick(dt)` API, τ≈250ms pan / 150ms zoom)
 - ✅ Bob-scaling for zoom speed
 - ✅ COP indicator with rezero progress overlay
 - 🔲 Keyboard-shortcut cheat-sheet overlay (toggle with `?`)

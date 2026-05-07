@@ -17,6 +17,10 @@ export interface GestureOptions {
   zoomBaseRatePerSec?: number;
   zoomBobMultiplier?: number;
   rezeroDurationMs?: number;
+  /** Exponential low-pass time constant for pan velocity (ms). Higher = more glide. */
+  panInertiaMs?: number;
+  /** Exponential low-pass time constant for zoom velocity (ms). Higher = more glide. */
+  zoomInertiaMs?: number;
 }
 
 const DEFAULTS: Required<GestureOptions> = {
@@ -29,6 +33,8 @@ const DEFAULTS: Required<GestureOptions> = {
   zoomBaseRatePerSec: 0.6,
   zoomBobMultiplier: 3.0,
   rezeroDurationMs: 2000,
+  panInertiaMs: 250,
+  zoomInertiaMs: 150,
 };
 
 const ZERO_COMMAND: PanZoomCommand = { panX: 0, panY: 0, zoom: 0, mode: "ABSENT" };
@@ -55,6 +61,11 @@ export class GestureInterpreter extends EventTarget {
   lastSample: BoardSample | null = null;
 
   private bobHistory: BobFrame[] = [];
+
+  /** Smoothed pan/zoom velocities updated by `tick()`. */
+  private velPanX = 0;
+  private velPanY = 0;
+  private velZoom = 0;
 
   private rezeroAccumX = 0;
   private rezeroAccumY = 0;
@@ -86,7 +97,41 @@ export class GestureInterpreter extends EventTarget {
     this.rezeroStartedAtMs = null;
     this.rezeroOffsetX = 0;
     this.rezeroOffsetY = 0;
+    this.velPanX = 0;
+    this.velPanY = 0;
+    this.velZoom = 0;
     this.transitionStatus("DISCONNECTED");
+  }
+
+  /**
+   * Advance the inertia simulation by `dt` seconds and return the smoothed
+   * command to apply this frame. Call this once per animation frame instead
+   * of reading `command` directly.
+   *
+   * Implements an exponential low-pass filter:
+   *   v += (target − v) × (1 − e^(−dt/τ))
+   * so velocity glides toward the instantaneous target with time constant τ.
+   */
+  tick(dt: number): PanZoomCommand {
+    const target = this.command;
+    const τPan  = this.options.panInertiaMs  / 1000;
+    const τZoom = this.options.zoomInertiaMs / 1000;
+    const αPan  = 1 - Math.exp(-dt / τPan);
+    const αZoom = 1 - Math.exp(-dt / τZoom);
+
+    this.velPanX += (target.panX - this.velPanX) * αPan;
+    this.velPanY += (target.panY - this.velPanY) * αPan;
+    this.velZoom += (target.zoom - this.velZoom) * αZoom;
+
+    // Snap sub-threshold velocities to zero to eliminate perpetual micro-drift.
+    const PAN_SNAP  = 0.5;   // px/s
+    const ZOOM_SNAP = 0.001; // levels/s
+    return {
+      panX: Math.abs(this.velPanX) < PAN_SNAP  ? 0 : this.velPanX,
+      panY: Math.abs(this.velPanY) < PAN_SNAP  ? 0 : this.velPanY,
+      zoom: Math.abs(this.velZoom) < ZOOM_SNAP ? 0 : this.velZoom,
+      mode: target.mode,
+    };
   }
 
   /** Current session COP offset (post-rezero correction applied to cop_x/cop_y). */

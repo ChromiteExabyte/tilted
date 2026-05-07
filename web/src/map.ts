@@ -129,7 +129,7 @@ const tick = (now: number): void => {
     requestAnimationFrame(tick);
     return;
   }
-  const cmd = gestures.command;
+  const cmd = gestures.tick(dt);
   if (cmd.panX || cmd.panY) {
     map.panBy([cmd.panX * dt, cmd.panY * dt], { animate: false });
   }

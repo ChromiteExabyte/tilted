@@ -188,7 +188,7 @@ const tick = (now: number): void => {
   const dt = Math.min(MAX_DT_S, (now - lastT) / 1000);
   lastT = now;
   if ((state === "STUDY" || state === "GUESS") && gestures.status === "READY") {
-    const cmd = gestures.command;
+    const cmd = gestures.tick(dt);
     const m = state === "STUDY" ? studyMap : guessMap;
     if (cmd.panX || cmd.panY) {
       if (state === "STUDY" && studyRotation !== 0) {

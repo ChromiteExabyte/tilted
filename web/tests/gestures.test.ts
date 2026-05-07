@@ -208,6 +208,74 @@ describe("command — zoom + bob", () => {
   });
 });
 
+describe("inertia — tick()", () => {
+  it("velocity approaches target command over successive ticks", () => {
+    const g = new GestureInterpreter({ panInertiaMs: 100 });
+    const t = calibrate(g);
+    // Rightward lean in PAN mode: left_share=0.25 > threshold, cop_x=0.5 > deadzone
+    g.onSample(sample({ TL: 10, TR: 30, BL: 10, BR: 30 }, (t + 33) / 1000));
+    const target = g.command.panX;
+    expect(target).toBeGreaterThan(0);
+
+    // First tick: velocity should be partway toward target
+    const first  = g.tick(0.033);
+    // After ~3τ (300 ms) the velocity should be very close to target
+    const after3tau = g.tick(0.300);
+
+    expect(first.panX).toBeGreaterThan(0);
+    expect(first.panX).toBeLessThan(target);
+    // After ~3τ the filter is at ≥95% of target; check it's at least 90% (lenient for float dt).
+    expect(after3tau.panX).toBeGreaterThan(target * 0.9);
+  });
+
+  it("velocity decays toward zero after board goes absent", () => {
+    const g = new GestureInterpreter({ panInertiaMs: 100 });
+    const t = calibrate(g);
+    // Build up velocity with a lean
+    g.onSample(sample({ TL: 5, TR: 35, BL: 5, BR: 35 }, (t + 33) / 1000));
+    g.tick(0.300); // warm up — velocity near target
+
+    // Board steps off → target becomes zero
+    g.onSample(sample({ TL: 0, TR: 0, BL: 0, BR: 0, present: false }, (t + 400) / 1000));
+    expect(g.command.panX).toBe(0); // instantaneous target is zero
+
+    // One τ later — velocity should be well below what it was
+    const decayed = g.tick(0.100); // dt = 1τ → α ≈ 0.63, vel ≈ 37% of peak
+    const nearZero = g.tick(0.500); // another ~5τ → essentially zero
+    expect(decayed.panX).toBeGreaterThanOrEqual(0); // still coasting (or snapped to 0)
+    expect(nearZero.panX).toBe(0); // snapped by PAN_SNAP threshold
+  });
+
+  it("resetRezero zeroes velocity mid-glide", () => {
+    const g = new GestureInterpreter({ panInertiaMs: 500 });
+    const t = calibrate(g);
+    g.onSample(sample({ TL: 5, TR: 35, BL: 5, BR: 35 }, (t + 33) / 1000));
+    g.tick(0.300); // build velocity
+
+    g.resetRezero();
+    // After reset, next tick with dt=0 should yield zero velocity
+    const after = g.tick(0);
+    expect(after.panX).toBe(0);
+    expect(after.panY).toBe(0);
+    expect(after.zoom).toBe(0);
+  });
+
+  it("zoom velocity smooths over time", () => {
+    const g = new GestureInterpreter({ zoomInertiaMs: 100 });
+    const t = calibrate(g);
+    // Left leg raised → ZOOM_IN
+    g.onSample(sample({ TL: 0.5, TR: 30, BL: 0.5, BR: 30 }, (t + 33) / 1000));
+    const targetZoom = g.command.zoom;
+    expect(targetZoom).toBeGreaterThan(0);
+
+    const first = g.tick(0.033);
+    const later  = g.tick(0.300);
+    expect(first.zoom).toBeGreaterThan(0);
+    expect(first.zoom).toBeLessThan(targetZoom);
+    expect(later.zoom).toBeGreaterThan(first.zoom);
+  });
+});
+
 describe("session re-zero", () => {
   it("starts in DISCONNECTED, transitions to REZEROING on presence, then READY", () => {
     const g = new GestureInterpreter({ rezeroDurationMs: 1000 });
